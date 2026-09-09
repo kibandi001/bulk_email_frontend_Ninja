@@ -5,7 +5,7 @@ against `NCA_Bulk_Email_Frontend_Process_Flow_2.md` (derived from the project's 
 Report, §2.2.6 and §6). Frontend only — every write goes through `services/` to an authenticated
 backend API; this app never sends email itself.
 
-> NCA stands for Ninja Cats Association
+
 
 ## Structure
 
