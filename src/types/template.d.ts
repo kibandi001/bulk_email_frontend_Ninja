@@ -3,12 +3,11 @@
 // Postman collection, so this feature stays on mock data — same pattern as
 // Quota, Roles & Permissions, and System Status in adminService.ts.
 
-export type TemplateCategory = 'Notices' | 'Newsletters' | 'Reminders' | 'Campaigns';
+import { API_BASE_URL, MOCK_LATENCY_MS } from '../config/constants';
 
 export interface EmailTemplate {
   id: string;
   name: string;
-  category: TemplateCategory;
   updatedAt: string;
   subjectPreview: string;
   bodyPreview: string;
@@ -18,10 +17,14 @@ export interface EmailTemplate {
 
 export interface TemplateDraft {
   name: string;
-  category: TemplateCategory;
   subjectPreview: string;
   bodyPreview: string;
   mergeFields: string[];
+  designJson?: Record<string, unknown>;
+  /** Files picked via the upload button, sent as TMail's `files` (create) /
+   * `attachments` (edit) form field. Not persisted in EmailTemplate — once
+   * uploaded, TMail owns the stored copies. */
+  files?: File[];
 }
 
 export interface TemplateValidationIssue {

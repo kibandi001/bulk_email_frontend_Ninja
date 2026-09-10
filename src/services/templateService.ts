@@ -1,19 +1,19 @@
-// Template Library / Template Editor (process flow §2). No endpoint for
-// this exists in the Tmail API collection, so everything here runs against
-// mock data via mockDelay, mirroring adminService.ts's still-mocked
-// sections. Swap the TODOs for real apiClient calls once a templates
-// endpoint exists.
+// Template Library / Template Editor (process flow §2). Wired to the real
+// API's Templates endpoints (tmail-templates.postman_collection.json), same
+// pattern as User Administration in adminService.ts — calls go straight
+// through apiClient with no special base URL of their own.
+//
+// duplicateTemplate() has no matching endpoint, so it's implemented as a
+// getTemplate() + createTemplate() pair instead.
 
-import { mockDelay } from './apiClient';
+import { apiClient } from './apiClient';
+
 import type {
   EmailTemplate,
   RenderPreviewTarget,
-  TemplateCategory,
   TemplateDraft,
   TemplateValidationIssue,
 } from '../types';
-
-export const TEMPLATE_CATEGORIES: TemplateCategory[] = ['Notices', 'Newsletters', 'Reminders', 'Campaigns'];
 
 /** §2 "Device / Email-client Preview" — same rendering matrix used in
  * Campaign Pre-Flight (§7/§8 of the process flow). */
@@ -24,89 +24,91 @@ export const PREVIEW_TARGETS: RenderPreviewTarget[] = [
   { label: 'Mobile — Mail (iOS)', widthPx: 360 },
 ];
 
-let mockTemplates: EmailTemplate[] = [
-  {
-    id: 't1',
-    name: 'NCA Public Notice',
-    category: 'Notices',
-    updatedAt: '2026-08-20T09:00:00+03:00',
-    subjectPreview: 'Public notice from the Ninja Construction Authority',
-    bodyPreview: 'Dear {{first_name}}, this is a public notice regarding {{notice_subject}}...',
-    mergeFields: ['{{first_name}}', '{{notice_subject}}'],
-  },
-  {
-    id: 't2',
-    name: 'Licence Reminder',
-    category: 'Reminders',
-    updatedAt: '2026-08-18T11:30:00+03:00',
-    subjectPreview: 'Your NCA licence renewal is due',
-    bodyPreview: 'Dear {{first_name}}, your licence {{licence_number}} expires on {{expiry_date}}...',
-    mergeFields: ['{{first_name}}', '{{licence_number}}', '{{expiry_date}}'],
-  },
-  {
-    id: 't3',
-    name: 'Newsletter — Two Column',
-    category: 'Newsletters',
-    updatedAt: '2026-08-12T14:00:00+03:00',
-    subjectPreview: 'NCA Monthly Update — {{month}}',
-    bodyPreview: 'This month at NCA: {{headline_1}} and {{headline_2}}...',
-    mergeFields: ['{{month}}', '{{headline_1}}', '{{headline_2}}'],
-  },
-  {
-    id: 't4',
-    name: 'Plain Text Advisory',
-    category: 'Campaigns',
-    updatedAt: '2026-08-05T08:15:00+03:00',
-    subjectPreview: 'Advisory: {{advisory_title}}',
-    bodyPreview: 'Dear {{first_name}}, please note the following advisory...',
-    mergeFields: ['{{first_name}}', '{{advisory_title}}'],
-  },
-];
+// TMail's list response wraps the array in a status/message envelope.
+interface TMailListResponse {
+  status_code: number;
+  message: string;
+  data: TMailTemplateRecord[];
+}
+
+interface TMailTemplateRecord {
+  id: string | number;
+  name: string;
+  content: string;
+  attachments?: { name: string; size: number; url: string }[] | null;
+  json_data?: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+}
+
+function fromTMailRecord(record: TMailTemplateRecord): EmailTemplate {
+  return {
+    id: String(record.id),
+    name: record.name,
+    updatedAt: record.updated_at ?? new Date().toISOString(),
+    subjectPreview: '', // TODO: TMail has no subject field — confirm if one exists or should be derived.
+    bodyPreview: record.content,
+    mergeFields: [...new Set(record.content.match(/{{\s*[\w.]+\s*}}/g) ?? [])],
+  };
+}
+
+// TMail's collection uses a different field name for uploads depending on
+// the route: 'files' on Create, 'attachments' on Edit. `fileFieldName` lets
+// createTemplate/updateTemplate each pass the right one.
+function toTMailFormData(draft: TemplateDraft, fileFieldName: 'files' | 'attachments'): FormData {
+  const fd = new FormData();
+  fd.append('name', draft.name);
+  fd.append('content', draft.bodyPreview);
+  fd.append('json_data', JSON.stringify(draft.designJson ?? {}));
+  for (const file of draft.files ?? []) {
+    fd.append(fileFieldName, file);
+  }
+  return fd;
+}
 
 export async function listTemplates(): Promise<EmailTemplate[]> {
-  // TODO: return apiClient.get<EmailTemplate[]>('/templates');
-  return mockDelay([...mockTemplates]);
+  const response = await apiClient.get<TMailListResponse>('/mail-templates/');
+  return response.data.map(fromTMailRecord);
+}
+
+interface TMailSingleResponse {
+  status_code: number;
+  message: string;
+  data: TMailTemplateRecord;
 }
 
 export async function getTemplate(id: string): Promise<EmailTemplate> {
-  // TODO: return apiClient.get<EmailTemplate>(`/templates/${id}`);
-  const existing = mockTemplates.find((t) => t.id === id);
-  if (!existing) throw new Error(`Unknown template ${id}`);
-  return mockDelay(existing);
+  const response = await apiClient.get<TMailSingleResponse>(`/mail-templates/${id}`);
+  return fromTMailRecord(response.data);
 }
 
 export async function createTemplate(draft: TemplateDraft): Promise<EmailTemplate> {
-  // TODO: return apiClient.post<EmailTemplate>('/templates', draft);
-  const created: EmailTemplate = { id: crypto.randomUUID(), updatedAt: new Date().toISOString(), ...draft };
-  mockTemplates = [created, ...mockTemplates];
-  return mockDelay(created);
+  const response = await apiClient.post<TMailSingleResponse>('/mail-templates/', toTMailFormData(draft, 'files'));
+  return fromTMailRecord(response.data);
 }
 
 export async function updateTemplate(id: string, draft: TemplateDraft): Promise<EmailTemplate> {
-  // TODO: return apiClient.put<EmailTemplate>(`/templates/${id}`, draft);
-  const updated: EmailTemplate = { id, updatedAt: new Date().toISOString(), ...draft };
-  mockTemplates = mockTemplates.map((t) => (t.id === id ? updated : t));
-  return mockDelay(updated);
+  const response = await apiClient.patch<TMailSingleResponse>(
+    `/mail-templates/${id}/`,
+    toTMailFormData(draft, 'attachments')
+  );
+  return fromTMailRecord(response.data);
 }
 
 export async function duplicateTemplate(id: string): Promise<EmailTemplate> {
-  // TODO: return apiClient.post<EmailTemplate>(`/templates/${id}/duplicate`);
-  const existing = mockTemplates.find((t) => t.id === id);
-  if (!existing) throw new Error(`Unknown template ${id}`);
-  const copy: EmailTemplate = {
-    ...existing,
-    id: crypto.randomUUID(),
+  // No dedicated TMail endpoint for this — fetch the existing template and
+  // recreate it under a tweaked name instead.
+  const existing = await getTemplate(id);
+  return createTemplate({
     name: `${existing.name} (copy)`,
-    updatedAt: new Date().toISOString(),
-  };
-  mockTemplates = [copy, ...mockTemplates];
-  return mockDelay(copy);
+    subjectPreview: existing.subjectPreview,
+    bodyPreview: existing.bodyPreview,
+    mergeFields: existing.mergeFields,
+  });
 }
 
 export async function deleteTemplate(id: string): Promise<void> {
-  // TODO: return apiClient.delete<void>(`/templates/${id}`);
-  mockTemplates = mockTemplates.filter((t) => t.id !== id);
-  return mockDelay(undefined);
+  return apiClient.delete<void>(`/mail-templates/${id}/`);
 }
 
 /** §2 "Validate" — lightweight client-side checks; a real integration would

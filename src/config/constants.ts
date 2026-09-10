@@ -4,9 +4,9 @@
 /** Base URL of the Bulk Email SaaS REST API (inception report §6.6). Empty
  * while developing against the built-in mock data — see services/apiClient.ts. */
 export const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? '';
-
 /** Quota usage bands the frontend renders (§15). The platform is the source
  * of truth for alerting; these thresholds only drive local badge/bar colour. */
+ // config/constants.ts
 export const QUOTA_THRESHOLDS = {
   WARNING: 80,
   CRITICAL: 90,
