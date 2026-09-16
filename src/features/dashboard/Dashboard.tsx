@@ -1,23 +1,22 @@
 import { useEffect, useState } from 'react';
 import { getDashboardSummary } from '../../services/analyticsService';
-import { getQuota } from '../../services/adminService';
 import type { DashboardSummary } from '../../services/analyticsService';
-import type { QuotaMetric } from '../../types';
 import { Card } from '../../components/ui/Card';
 import { StatusBadge } from '../../components/ui/StatusBadge';
-import { QuotaBar } from '../../components/ui/QuotaBar';
 
 export function Dashboard() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [quota, setQuota] = useState<QuotaMetric[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getDashboardSummary().then(setSummary);
-    getQuota().then(setQuota);
+    getDashboardSummary().then(setSummary).catch((reason) => {
+      setError(reason instanceof Error ? reason.message : 'Could not load dashboard data.');
+    });
   }, []);
 
   return (
     <div>
+      {error && <div className="campaign-studio__alert">{error}</div>}
       <p className="section-intro">
         Live view of sending activity for the tenant. Figures reflect the current 24-hour
         window and the most recent completed campaigns.
@@ -68,10 +67,14 @@ export function Dashboard() {
           </table>
         </Card>
 
-        <Card title="Account quota">
-          {quota.map((m) => (
-            <QuotaBar key={m.label} metric={m} />
-          ))}
+        <Card title="Campaign pipeline">
+          <div className="stat">
+            <span className="stat__value">{summary?.recentCampaigns?.length ?? 0}</span>
+            <span className="stat__label">recent campaigns returned by the live API</span>
+          </div>
+          <div className="stat" style={{ marginTop: 16 }}>
+            <span className="stat__label">Dashboard statistics are loaded from the live TMail API. The supplied API collection does not include a quota endpoint, so no fabricated quota figures are shown.</span>
+          </div>
         </Card>
       </div>
     </div>

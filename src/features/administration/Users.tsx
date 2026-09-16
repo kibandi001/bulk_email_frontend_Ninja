@@ -75,7 +75,7 @@ export function Users() {
   return (
     <div>
       <p className="section-intro">
-        Enable or disable administrator access, and invite new users to a company. Every account
+        Set each account to either Admin or User, and invite new users to a company. Every account
         is personal — shared logins are not permitted.
       </p>
 
@@ -130,21 +130,25 @@ export function Users() {
                 <td className="mono">{u.email}</td>
                 <td className="mono">{u.phone ?? '—'}</td>
                 <td>{companies.find((c) => c.id === u.companyId)?.name ?? u.companyId ?? '—'}</td>
-                <td>{u.isAdmin ? 'Administrator' : 'Standard'}</td>
-                <td style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    className="btn"
+                <td>
+                  <select
+                    aria-label={`Access level for ${u.username || u.email}`}
+                    value={u.isAdmin ? 'admin' : 'user'}
                     disabled={editingId === u.id}
-                    onClick={() => {
-                      setEditingId(u.id);
-                      handleToggleAdmin(u);
+                    onChange={(e) => {
+                      const makeAdmin = e.target.value === 'admin';
+                      if (makeAdmin !== u.isAdmin) {
+                        setEditingId(u.id);
+                        handleToggleAdmin(u);
+                      }
                     }}
                   >
-                    {u.isAdmin ? 'Revoke admin' : 'Make admin'}
-                  </button>
-                  <button className="btn" onClick={() => handleDelete(u)}>
-                    Remove
-                  </button>
+                    <option value="user">User</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </td>
+                <td>
+                  <button className="btn" onClick={() => handleDelete(u)}>Remove</button>
                 </td>
               </tr>
             ))}
