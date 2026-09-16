@@ -1,0 +1,60 @@
+@import url('https://cdnjs.cloudflare.com/ajax/libs/ibm-plex/6.1.1/css/ibm-plex.min.css');
+
+:root {
+
+  --ink: #10233a;          /* primary text, dark surfaces */
+  --blueprint: #1c5a8c;    /* primary action — structural blue */
+  --blueprint-dim: #e7eff5;
+  --amber: #c8892a;        /* quota / warning — desaturated hazard amber */
+  --amber-dim: #f7ecd9;
+  --verified: #2e7d5b;     /* success, delivered, consent granted */
+  --verified-dim: #e6f0ea;
+  --alert: #b23a3a;        /* errors, bounces, failures */
+  --alert-dim: #f6e8e8;
+  --paper: #f6f4ef;        /* background — drawing-paper warmth */
+  --paper-raised: #ffffff;
+  --line: #d9d4c7;         /* hairline borders */
+  --line-strong: #b7b0a0;
+  --muted: #6b6456;
+
+  --font-display: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  --radius: 3px;
+  --sidebar-w: 248px;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+button { font-family: inherit; }
+
+a { color: var(--blueprint); }
+
+::selection { background: var(--blueprint-dim); }
+
+:focus-visible {
+  outline: 2px solid var(--blueprint);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
