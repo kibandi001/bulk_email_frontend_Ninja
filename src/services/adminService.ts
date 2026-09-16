@@ -70,12 +70,7 @@ interface RawManagedUser {
   id: number;
   email: string;
   username: string;
-  is_admin?: boolean;
-  isAdmin?: boolean;
-  is_superuser?: boolean;
-  role?: string;
-  roles?: string[];
-  groups?: (string | { name: string })[];
+  is_admin: boolean;
   company_id: number | null;
   phone: string | null;
 }
@@ -86,17 +81,14 @@ interface RawUserPage {
 }
 
 function mapManagedUser(raw: RawManagedUser): ManagedUser {
-  const isAdmin = Boolean(raw.is_admin ?? raw.isAdmin);
-  const isSuperuser = Boolean(raw.is_superuser);
-  const groups = raw.groups ?? raw.roles;
   return {
     id: raw.id,
     email: raw.email,
     username: raw.username,
-    isAdmin,
+    isAdmin: raw.is_admin,
     companyId: raw.company_id,
     phone: raw.phone,
-    role: roleFromIsAdmin(isAdmin, raw.role, groups, isSuperuser),
+    role: roleFromIsAdmin(raw.is_admin),
   };
 }
 

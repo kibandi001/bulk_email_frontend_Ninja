@@ -41,28 +41,15 @@ export interface Campaign {
   subject: string;
   status: CampaignStatus;
   recipients: number;
-  targetGroup?: string;
   scheduledFor?: string;
   openRate?: number;
   clickRate?: number;
   bounceRate?: number;
-  createdAt?: string;
-  sentAt?: string;
-  emailStatus?: string;
-  deliveryStatus?: string;
-  body?: string;
-  fromEmail?: string;
-  sender?: string;
-  template?: string;
 }
 
 export interface CampaignDraft {
   name: string;
   subject: string;
-  targetGroup?: string;
+  template: string;
   abTest: boolean;
-  body?: string;
-  fromEmail?: string;
-  sender?: string;
-  template?: string;
 }

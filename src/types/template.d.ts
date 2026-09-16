@@ -1,13 +1,13 @@
 // Template Library, Template Editor, and the device/email-client preview
-// matrix (process flow §2). Wired to the real Tmail /mail-templates/
-// endpoints — see services/templateService.ts.
+// matrix (process flow §2). No endpoint for this exists in the Tmail API
+// Postman collection, so this feature stays on mock data — same pattern as
+// Quota, Roles & Permissions, and System Status in adminService.ts.
 
-export type TemplateCategory = 'Notices' | 'Newsletters' | 'Reminders' | 'Campaigns';
+import { API_BASE_URL, MOCK_LATENCY_MS } from '../config/constants';
 
 export interface EmailTemplate {
   id: string;
   name: string;
-  category: TemplateCategory;
   updatedAt: string;
   subjectPreview: string;
   bodyPreview: string;
@@ -17,16 +17,14 @@ export interface EmailTemplate {
 
 export interface TemplateDraft {
   name: string;
-  category: TemplateCategory;
   subjectPreview: string;
   bodyPreview: string;
   mergeFields: string[];
-  /** Files to upload alongside the template ('files' field on Create, 'attachments' on Edit). */
-  files?: File[];
-  /** Arbitrary extra data persisted in the API's json_data column (also used
-   * to round-trip category/subject, which the TMail schema has no native
-   * columns for). */
   designJson?: Record<string, unknown>;
+  /** Files picked via the upload button, sent as TMail's `files` (create) /
+   * `attachments` (edit) form field. Not persisted in EmailTemplate — once
+   * uploaded, TMail owns the stored copies. */
+  files?: File[];
 }
 
 export interface TemplateValidationIssue {

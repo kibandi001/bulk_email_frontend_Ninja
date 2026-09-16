@@ -1,728 +1,79 @@
 .sidebar {
-  --sidebar-expanded-width: var(--sidebar-w);
-  --sidebar-collapsed-width: 68px;
-
-  width: var(--sidebar-expanded-width);
-  height: 100vh;
-
+  width: var(--sidebar-w);
   flex-shrink: 0;
-
-  position: sticky;
-  top: 0;
-
-  display: flex;
-  flex-direction: column;
-
-  box-sizing: border-box;
-
-  padding: 10px;
-
   background: var(--ink);
   color: #eef1f4;
-
-  border-right: 1px solid rgba(255, 255, 255, 0.07);
-
-  overflow: visible;
-
-  transition:
-    width 0.22s cubic-bezier(0.4, 0, 0.2, 1),
-    padding 0.22s ease;
-
-  z-index: 30;
-}
-
-.sidebar--collapsed {
-  width: var(--sidebar-collapsed-width);
-  padding-left: 8px;
-  padding-right: 8px;
-}
-
-/* =================================
-   HEADER
-================================= */
-
-.sidebar__header {
-  position: relative;
-
-  min-height: 50px;
-
-  display: flex;
-  align-items: center;
-
-  padding: 2px 4px 12px;
-
-  margin-bottom: 7px;
-
-  border-bottom: 1px solid
-    rgba(255, 255, 255, 0.07);
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  overflow-y: auto;
+  padding: 20px 14px 24px;
 }
 
 .sidebar__brand {
-  min-width: 0;
-
   display: flex;
   align-items: center;
-
   gap: 10px;
-
-  color: inherit;
-  text-decoration: none;
+  padding: 4px 6px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  margin-bottom: 18px;
 }
 
 .sidebar__brand-mark {
-  width: 31px;
-  height: 29px;
-
-  flex: 0 0 31px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  border-radius: 7px;
-
-  background: #eef1f4;
-  color: var(--ink);
-
   font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 800;
-
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--ink);
+  background: #eef1f4;
+  padding: 5px 7px;
+  border-radius: 3px;
   letter-spacing: 0.04em;
-
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.18);
-
-  transition:
-    opacity 0.15s ease,
-    transform 0.15s ease;
-}
-
-/* =================================
-   BRAND TEXT
-================================= */
-
-.sidebar__brand-copy {
-  min-width: 0;
-
-  max-width: 180px;
-
-  overflow: hidden;
-
-  opacity: 1;
-
-  transition:
-    max-width 0.18s ease,
-    opacity 0.14s ease;
 }
 
 .sidebar__brand-title {
   margin: 0;
-
-  color: #fff;
-
   font-size: 13px;
-  line-height: 1.2;
   font-weight: 600;
-
-  white-space: nowrap;
-
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.sidebar__brand-sub {
-  margin: 2px 0 0;
-
-  color: #8794a2;
-
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-
-  white-space: nowrap;
-}
-
-.sidebar--collapsed
-.sidebar__brand-copy {
-  max-width: 0;
-
-  opacity: 0;
-
-  pointer-events: none;
-}
-
-/* =================================
-   CHATGPT-STYLE TOP TOGGLE
-================================= */
-
-.sidebar__toggle {
-  position: absolute;
-
-  top: 50%;
-
-  right: 2px;
-
-  width: 32px;
-  height: 32px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  padding: 0;
-
-  border: 0;
-  border-radius: 7px;
-
-  background: transparent;
-
-  color: #9ca6b0;
-
-  cursor: pointer;
-
-  opacity: 1;
-
-  transform: translateY(-50%);
-
-  transition:
-    background 0.15s ease,
-    color 0.15s ease,
-    opacity 0.16s ease,
-    transform 0.16s ease;
-}
-
-.sidebar__toggle:hover {
-  background: rgba(255, 255, 255, 0.08);
   color: #fff;
 }
-
-.sidebar__toggle:active {
-  background: rgba(255, 255, 255, 0.12);
+.sidebar__brand-sub {
+  margin: 1px 0 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: #9aa7b4;
 }
-
-.sidebar__toggle:focus-visible {
-  outline: 2px solid #63b3ed;
-  outline-offset: 2px;
-}
-
-/*
- * Expanded state:
- * The button remains visible at the top-right,
- * just like ChatGPT.
- */
-.sidebar:not(.sidebar--collapsed)
-.sidebar__toggle {
-  opacity: 0.82;
-}
-
-/*
- * Collapsed state:
- * Hide the button by default.
- */
-.sidebar--collapsed
-.sidebar__toggle {
-  right: 50%;
-
-  opacity: 0;
-
-  transform:
-    translate(50%, -50%)
-    scale(0.92);
-
-  pointer-events: none;
-}
-
-/*
- * When the mouse is over the top/brand area,
- * reveal the expand button.
- */
-.sidebar--collapsed
-.sidebar__header:hover
-.sidebar__toggle {
-  opacity: 1;
-
-  transform:
-    translate(50%, -50%)
-    scale(1);
-
-  pointer-events: auto;
-}
-
-/*
- * While hovering the logo, slightly dim it so the
- * toggle becomes the obvious interaction.
- */
-.sidebar--collapsed
-.sidebar__header:hover
-.sidebar__brand-mark {
-  opacity: 0.16;
-
-  transform: scale(0.96);
-}
-
-/* =================================
-   SCROLL
-================================= */
-
-.sidebar__scroll {
-  flex: 1;
-
-  min-height: 0;
-
-  overflow-y: auto;
-  overflow-x: hidden;
-
-  padding: 4px 2px;
-
-  scrollbar-width: thin;
-
-  scrollbar-color:
-    rgba(255, 255, 255, 0.13)
-    transparent;
-}
-
-.sidebar__scroll::-webkit-scrollbar {
-  width: 4px;
-}
-
-.sidebar__scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.sidebar__scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.13);
-
-  border-radius: 999px;
-}
-
-.sidebar__scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.22);
-}
-
-/* =================================
-   GROUPS
-================================= */
 
 .sidebar__group {
   margin-bottom: 18px;
 }
 
 .sidebar__group-label {
-  padding: 0 8px;
-
-  margin: 0 0 5px;
-
-  color: #737f8b;
-
   font-family: var(--font-mono);
-  font-size: 9.5px;
-
-  letter-spacing: 0.08em;
-
+  font-size: 10px;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-
-  white-space: nowrap;
-
-  overflow: hidden;
-
-  max-height: 18px;
-
-  opacity: 1;
-
-  transition:
-    max-height 0.18s ease,
-    opacity 0.14s ease,
-    margin 0.18s ease;
+  color: #7c8794;
+  margin: 0 0 6px 10px;
 }
-
-.sidebar--collapsed
-.sidebar__group-label {
-  max-height: 0;
-
-  opacity: 0;
-
-  margin-bottom: 0;
-}
-
-.sidebar__group-items {
-  display: flex;
-  flex-direction: column;
-
-  gap: 1px;
-}
-
-/* =================================
-   LINKS
-================================= */
 
 .sidebar__link {
-  position: relative;
-
-  min-height: 38px;
-
-  display: flex;
-  align-items: center;
-
-  gap: 11px;
-
-  padding: 0 10px;
-
-  border-radius: 7px;
-
-  color: #bcc5ce;
-
+  display: block;
+  padding: 8px 10px;
+  border-radius: 3px;
+  font-size: 13.5px;
+  color: #cdd5dc;
   text-decoration: none;
-
-  font-size: 13px;
-  font-weight: 400;
-
-  white-space: nowrap;
-
-  transition:
-    background 0.14s ease,
-    color 0.14s ease,
-    transform 0.14s ease;
+  margin-bottom: 2px;
+  border-left: 2px solid transparent;
 }
 
 .sidebar__link:hover {
-  background: rgba(255, 255, 255, 0.065);
-
+  background: rgba(255, 255, 255, 0.06);
   color: #fff;
 }
-
-.sidebar__link:focus-visible {
-  outline: 2px solid #63b3ed;
-  outline-offset: 2px;
-}
-
-.sidebar__link-icon {
-  width: 18px;
-  height: 18px;
-
-  flex: 0 0 18px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  color: #9aa6b2;
-
-  transition:
-    color 0.14s ease,
-    transform 0.14s ease;
-}
-
-.sidebar__link:hover
-.sidebar__link-icon {
-  color: #fff;
-
-  transform: scale(1.04);
-}
-
-.sidebar__link-text {
-  min-width: 0;
-
-  max-width: 190px;
-
-  overflow: hidden;
-
-  text-overflow: ellipsis;
-
-  white-space: nowrap;
-
-  opacity: 1;
-
-  transition:
-    max-width 0.18s ease,
-    opacity 0.14s ease;
-}
-
-/* =================================
-   COLLAPSED LINKS
-================================= */
-
-.sidebar--collapsed
-.sidebar__link {
-  width: 44px;
-
-  min-height: 42px;
-
-  margin: 0 auto;
-
-  padding: 0;
-
-  justify-content: center;
-
-  gap: 0;
-}
-
-.sidebar--collapsed
-.sidebar__link-text {
-  max-width: 0;
-
-  opacity: 0;
-
-  pointer-events: none;
-}
-
-.sidebar--collapsed
-.sidebar__link:hover {
-  transform: none;
-}
-
-/* =================================
-   ACTIVE LINK
-================================= */
 
 .sidebar__link--active {
-  background:
-    rgba(28, 90, 140, 0.32);
-
+  background: rgba(28, 90, 140, 0.35);
   color: #fff;
-
-  font-weight: 500;
-}
-
-.sidebar__link--active::before {
-  content: '';
-
-  position: absolute;
-
-  left: 0;
-
-  top: 8px;
-  bottom: 8px;
-
-  width: 3px;
-
-  border-radius:
-    0 4px 4px 0;
-
-  background: #63b3ed;
-}
-
-.sidebar__link--active
-.sidebar__link-icon {
-  color: #63b3ed;
-}
-
-.sidebar__link--active:hover {
-  background:
-    rgba(28, 90, 140, 0.39);
-}
-
-.sidebar--collapsed
-.sidebar__link--active {
-  background:
-    rgba(28, 90, 140, 0.45);
-}
-
-.sidebar--collapsed
-.sidebar__link--active::before {
-  left: 2px;
-
-  top: 9px;
-  bottom: 9px;
-}
-
-/* =================================
-   COLLAPSED TOOLTIP
-================================= */
-
-@media (min-width: 861px) {
-  .sidebar--collapsed
-  .sidebar__link:hover::after {
-    content: attr(title);
-
-    position: absolute;
-
-    left: calc(100% + 9px);
-
-    top: 50%;
-
-    transform: translateY(-50%);
-
-    z-index: 100;
-
-    padding: 6px 9px;
-
-    color: #fff;
-
-    background: #18212b;
-
-    border: 1px solid
-      rgba(255, 255, 255, 0.08);
-
-    border-radius: 6px;
-
-    font-size: 11px;
-    font-weight: 500;
-
-    white-space: nowrap;
-
-    box-shadow:
-      0 8px 20px
-      rgba(0, 0, 0, 0.25);
-
-    pointer-events: none;
-  }
-}
-
-/* =================================
-   MOBILE
-================================= */
-
-@media (max-width: 860px) {
-  .sidebar {
-    width: min(300px, 86vw);
-
-    height: 100dvh;
-
-    position: fixed;
-
-    inset: 0 auto 0 0;
-
-    transform: translateX(-105%);
-
-    padding: 12px;
-
-    box-shadow:
-      12px 0 34px
-      rgba(0, 0, 0, 0.22);
-
-    transition:
-      transform 0.23s
-      cubic-bezier(0.4, 0, 0.2, 1);
-
-    z-index: 100;
-  }
-
-  .sidebar.sidebar--mobile-open {
-    transform: translateX(0);
-  }
-
-  /*
-   * On mobile, the sidebar is always fully expanded
-   * when opened.
-   */
-  .sidebar--collapsed {
-    width: min(300px, 86vw);
-
-    padding: 12px;
-  }
-
-  .sidebar--collapsed
-  .sidebar__brand-copy,
-  .sidebar--collapsed
-  .sidebar__group-label,
-  .sidebar--collapsed
-  .sidebar__link-text {
-    max-width: 190px;
-
-    opacity: 1;
-
-    pointer-events: auto;
-  }
-
-  .sidebar--collapsed
-  .sidebar__link {
-    width: auto;
-
-    min-height: 40px;
-
-    margin: 0;
-
-    padding: 0 10px;
-
-    justify-content: flex-start;
-
-    gap: 11px;
-  }
-
-  .sidebar--collapsed
-  .sidebar__link--active {
-    background:
-      rgba(28, 90, 140, 0.32);
-  }
-
-  .sidebar--collapsed
-  .sidebar__link--active::before {
-    left: 0;
-  }
-
-  /*
-   * Mobile toggle stays visible at top-right.
-   */
-  .sidebar__toggle {
-    position: absolute;
-
-    right: 2px;
-
-    top: 50%;
-
-    width: 32px;
-    height: 32px;
-
-    opacity: 0.9;
-
-    transform:
-      translateY(-50%);
-  }
-
-  .sidebar--collapsed
-  .sidebar__toggle {
-    right: 2px;
-
-    opacity: 0.9;
-
-    transform:
-      translateY(-50%)
-      scale(1);
-
-    pointer-events: auto;
-  }
-
-  .sidebar--collapsed
-  .sidebar__header:hover
-  .sidebar__toggle {
-    transform:
-      translateY(-50%)
-      scale(1.03);
-  }
-
-  .sidebar--collapsed
-  .sidebar__header:hover
-  .sidebar__brand-mark {
-    opacity: 1;
-
-    transform: none;
-  }
-}
-
-/* =================================
-   SMALL MOBILE
-================================= */
-
-@media (max-width: 520px) {
-  .sidebar {
-    width: min(310px, 90vw);
-  }
-
-  .sidebar__link {
-    min-height: 42px;
-  }
-}
-
-/* =================================
-   REDUCED MOTION
-================================= */
-
-@media (prefers-reduced-motion: reduce) {
-  .sidebar,
-  .sidebar *,
-  .sidebar *::before,
-  .sidebar *::after {
-    animation: none !important;
-    transition: none !important;
-  }
+  border-left-color: #4f9cd6;
 }

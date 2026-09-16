@@ -3,8 +3,9 @@
 // base URL only need to be right in one place.
 //
 // The platform's REST API is OAuth 2.0 bearer / scoped API key (inception
-// report §6.6). Every service function now calls through apiClient.* — no
-// mock/local data layer remains.
+// report §6.6). Until a backend is connected, individual service functions
+// resolve against local mock data via `mockDelay` instead of calling
+// `apiClient.*` — swapping one for the other is the whole migration.
 
 import { API_BASE_URL, MOCK_LATENCY_MS } from '../config/constants';
 
@@ -134,9 +135,9 @@ export const apiClient = {
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 };
 
-export { SESSION_EXPIRED_EVENT };
-
-// Backwards-compatible helper used by the service layer for local/mock-only endpoints.
+// Resolves `value` after a simulated network delay. Used by the mock implementations in the other service files; replace the call site with the matching `apiClient.*` call once a real endpoint exists.
 export function mockDelay<T>(value: T, ms: number = MOCK_LATENCY_MS): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), ms));
 }
+
+export { SESSION_EXPIRED_EVENT };

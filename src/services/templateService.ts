@@ -11,15 +11,9 @@ import { apiClient } from './apiClient';
 import type {
   EmailTemplate,
   RenderPreviewTarget,
-  TemplateCategory,
   TemplateDraft,
   TemplateValidationIssue,
 } from '../types';
-
-/** Category options shown in the Template Editor / Library filters. The
- * TMail schema has no category column, so this is a client-side taxonomy
- * persisted into json_data (see toTMailFormData/fromTMailRecord below). */
-export const TEMPLATE_CATEGORIES: TemplateCategory[] = ['Notices', 'Newsletters', 'Reminders', 'Campaigns'];
 
 /** §2 "Device / Email-client Preview" — same rendering matrix used in
  * Campaign Pre-Flight (§7/§8 of the process flow). */
@@ -47,18 +41,12 @@ interface TMailTemplateRecord {
   updated_at?: string;
 }
 
-function isTemplateCategory(value: unknown): value is TemplateCategory {
-  return typeof value === 'string' && (TEMPLATE_CATEGORIES as string[]).includes(value);
-}
-
 function fromTMailRecord(record: TMailTemplateRecord): EmailTemplate {
-  const jsonData = record.json_data ?? {};
   return {
     id: String(record.id),
     name: record.name,
-    category: isTemplateCategory(jsonData.category) ? jsonData.category : 'Campaigns',
     updatedAt: record.updated_at ?? new Date().toISOString(),
-    subjectPreview: typeof jsonData.subjectPreview === 'string' ? jsonData.subjectPreview : '',
+    subjectPreview: '', // TODO: TMail has no subject field — confirm if one exists or should be derived.
     bodyPreview: record.content,
     mergeFields: [...new Set(record.content.match(/{{\s*[\w.]+\s*}}/g) ?? [])],
   };
@@ -71,10 +59,7 @@ function toTMailFormData(draft: TemplateDraft, fileFieldName: 'files' | 'attachm
   const fd = new FormData();
   fd.append('name', draft.name);
   fd.append('content', draft.bodyPreview);
-  fd.append(
-    'json_data',
-    JSON.stringify({ ...(draft.designJson ?? {}), category: draft.category, subjectPreview: draft.subjectPreview })
-  );
+  fd.append('json_data', JSON.stringify(draft.designJson ?? {}));
   for (const file of draft.files ?? []) {
     fd.append(fileFieldName, file);
   }
@@ -116,7 +101,6 @@ export async function duplicateTemplate(id: string): Promise<EmailTemplate> {
   const existing = await getTemplate(id);
   return createTemplate({
     name: `${existing.name} (copy)`,
-    category: existing.category,
     subjectPreview: existing.subjectPreview,
     bodyPreview: existing.bodyPreview,
     mergeFields: existing.mergeFields,

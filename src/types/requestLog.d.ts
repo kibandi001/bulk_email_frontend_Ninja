@@ -1,6 +1,6 @@
 // Shape used by GET /logs/stats/ (Tmail API, "Request Logs" folder).
-// Distinct from the app's existing AuditLogEntry (admin/user actions —
-// see auditService.ts): this endpoint's filters
+// Distinct from the app's existing AuditLogEntry (admin/user actions,
+// currently still mocked — see auditService.ts): this endpoint's filters
 // (log_status, action_id) read as request/API-call-level logs rather than
 // human admin actions, so it's modelled and displayed separately as
 // "Request Logs" rather than folded into the Audit Log page.
