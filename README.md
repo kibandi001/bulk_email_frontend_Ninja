@@ -5,7 +5,7 @@ against `NCA_Bulk_Email_Frontend_Process_Flow_2.md` (derived from the project's 
 Report, §2.2.6 and §6). Frontend only — every write goes through `services/` to an authenticated
 backend API; this app never sends email itself.
 
-
+> NCA stands for Ninja Cats Association
 
 ## Structure
 
@@ -44,6 +44,24 @@ src/
 
 Every service currently resolves against local mock data via `mockDelay(...)`; each function has
 a `// TODO` comment showing the exact `apiClient.*` call to swap in once a backend is connected.
+
+## npm 11 install-script warning
+
+This project explicitly approves `esbuild` because Vite needs its install-time binary setup. If npm still reports `esbuild` as unreviewed after extracting the project, run:
+
+```bash
+npm install-scripts approve esbuild
+npm install
+```
+
+Then use the scripts from the project root:
+
+```bash
+npm run dev
+npm run build
+```
+
+If `npm run dev` or `npm run build` says `Missing script`, you are not currently inside this project's directory. Run `ls` and confirm that `package.json` is the NCA Bulk Email frontend package before running npm commands.
 
 ## Getting started
 

@@ -1,7 +1,7 @@
 // // RBAC identity, roles, and the permission matrix shape.
 // // Populated by services/authService.ts and services/adminService.ts (§0.1.1, §16).
 
-// export type UserRole = 'admin' | 'campaign_manager' | 'auditor' | 'app_integrator';
+// export type UserRole = 'admin' | 'user' | 'campaign_manager' | 'auditor' | 'app_integrator';
 
 // export interface AuthUser {
 //   id: string;
@@ -34,7 +34,7 @@
 // RBAC identity, roles, and the permission matrix shape.
 // Populated by services/authService.ts and services/adminService.ts (§0.1.1, §16).
 
-export type UserRole = 'admin' | 'campaign_manager' | 'auditor' | 'app_integrator';
+export type UserRole = 'admin' | 'user' | 'campaign_manager' | 'auditor' | 'app_integrator';
 
 export interface AuthUser {
   id: string;
@@ -58,9 +58,7 @@ export interface ManagedUser {
   isAdmin: boolean;
   companyId: number | null;
   phone: string | null;
-  /** Derived, not sent by the API: 'admin' if isAdmin else 'campaign_manager'.
-   * See authService.ts's NOTE ON ROLE — auditor/app_integrator aren't
-   * representable until a real roles endpoint exists. */
+  /** Derived, not sent by the API: 'admin' if isAdmin else 'user'. */
   role: UserRole;
 }
 

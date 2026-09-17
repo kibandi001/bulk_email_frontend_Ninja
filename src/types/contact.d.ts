@@ -14,6 +14,7 @@ export interface Contact {
 
 export type ContactImportResult = {
   imported: number;
+  updated: number;
   duplicates: number;
   invalid: number;
   suppressed: number;

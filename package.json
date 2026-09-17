@@ -6,15 +6,14 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "oxlint",
+    "lint": "oxlint src",
     "preview": "vite preview"
   },
   "dependencies": {
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-email-editor": "^2.1.2",
     "react-router-dom": "^7.18.2",
-    "zod": "^4.5.4"
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
@@ -24,5 +23,8 @@
     "oxlint": "^1.79.0",
     "typescript": "~6.0.2",
     "vite": "^8.2.2"
+  },
+  "allowScripts": {
+    "esbuild": true
   }
 }
