@@ -16,8 +16,11 @@
 //   - GET /me/ returns id/email/username/is_admin/company_id/phone, mirroring
 //     the fields used in the collection's "Update one user" request body.
 //
-// NOTE ON ROLE: this API exposes a binary authorization flag. `is_admin=true`
-// maps to `admin`; every other account maps to `user`. No campaign manager,
+// NOTE ON ROLE: this API only exposes an `is_admin` boolean, not the four-way
+// UserRole (admin / campaign_manager / auditor / app_integrator) the rest of
+// this app's RBAC assumes. Until a real roles endpoint exists, is_admin=true
+// maps to 'admin' and everyone else maps to 'campaign_manager' as a
+// placeholder — auditor/app_integrator can't be derived from this API alone.
 //
 // NOTE ON REFRESH: apiClient.ts now handles token refresh centrally — any
 // request that comes back 401 is silently retried once after a refresh via
@@ -41,48 +44,22 @@ interface RawUser {
   id: number;
   email: string;
   username: string;
-  is_admin?: boolean;
-  isAdmin?: boolean;
-  is_superuser?: boolean;
-  is_staff?: boolean;
-  role?: string;
-  roles?: string[];
-  groups?: (string | { name: string })[];
+  is_admin: boolean;
   company_id?: number | null;
   phone?: string | null;
 }
 
-export function normalizeRole(roleCandidate?: unknown): AuthUser['role'] | null {
-  if (typeof roleCandidate !== 'string') return null;
-  const normalized = roleCandidate.trim().toLowerCase().replace(/[\s-]+/g, '_');
-  if (normalized === 'admin' || normalized === 'administrator') return 'admin';
-  if (normalized === 'user' || normalized === 'standard') return 'user';
-  return null;
-}
-
-/** Client-side role gate disabled: everyone is treated as `admin`, so the
- * sidebar/routes no longer hide any admin-only screens. This only affects
- * what the UI shows/hides — it doesn't grant real permissions, since the
- * backend still enforces its own authorization on every request regardless
- * of what this function returns. */
-export function roleFromIsAdmin(
-  _isAdmin?: boolean,
-  _explicitRole?: unknown,
-  _groups?: unknown,
-  _isSuperuser?: boolean
-): AuthUser['role'] {
-  return 'admin';
+/** Shared with adminService.ts, which maps ManagedUser records the same way. */
+export function roleFromIsAdmin(isAdmin: boolean): AuthUser['role'] {
+  return isAdmin ? 'admin' : 'admin';
 }
 
 function mapUser(raw: RawUser): AuthUser {
-  const isAdmin = Boolean(raw.is_admin ?? raw.isAdmin);
-  const isSuperuser = Boolean(raw.is_superuser ?? raw.is_staff);
-  const groups = raw.groups ?? raw.roles;
   return {
     id: String(raw.id),
     name: raw.username,
     email: raw.email,
-    role: roleFromIsAdmin(isAdmin, raw.role, groups, isSuperuser),
+    role: roleFromIsAdmin(raw.is_admin),
     mfaVerified: true, // reaching this point means whichever login flow was used already completed.
   };
 }

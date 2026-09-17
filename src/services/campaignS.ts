@@ -98,7 +98,8 @@ function extractCampaigns(payload: CampaignResponse): Campaign[] {
 
 function extractCampaign(payload: SingleCampaignResponse): Campaign {
   if (Array.isArray(payload)) return toCampaign(payload[0]);
-  if ('data' in payload && payload.data) return toCampaign(Array.isArray(payload.data) ? payload.data[0] : payload.data);
+  if ('data' in payload && payload.data)
+    return toCampaign(Array.isArray(payload.data) ? payload.data[0] : payload.data);
   if ('campaign' in payload && payload.campaign) return toCampaign(payload.campaign);
   if ('results' in payload && payload.results?.[0]) return toCampaign(payload.results[0]);
   return toCampaign(payload as RawCampaign);
@@ -135,7 +136,9 @@ export async function listCampaigns(): Promise<Campaign[]> {
 }
 
 export async function getCampaign(campaignId: string): Promise<Campaign> {
-  const payload = await apiClient.get<SingleCampaignResponse>(`/campaigns/${encodeURIComponent(campaignId)}/`);
+  const payload = await apiClient.get<SingleCampaignResponse>(
+    `/campaigns/${encodeURIComponent(campaignId)}/`,
+  );
   return extractCampaign(payload);
 }
 
@@ -156,7 +159,9 @@ export async function updateCampaign(campaignId: string, draft: Partial<Campaign
 }
 
 export async function sendCampaign(campaignId: string): Promise<Campaign> {
-  const payload = await apiClient.post<SingleCampaignResponse>(`/campaigns/${encodeURIComponent(campaignId)}/send/`);
+  const payload = await apiClient.post<SingleCampaignResponse>(
+    `/campaigns/${encodeURIComponent(campaignId)}/send/`,
+  );
   return extractCampaign(payload);
 }
 
@@ -167,7 +172,10 @@ export interface ScheduleCampaignInput {
   scheduleType: 'once' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom';
 }
 
-export async function scheduleCampaign(campaignId: string, schedule: ScheduleCampaignInput): Promise<Campaign> {
+export async function scheduleCampaign(
+  campaignId: string,
+  schedule: ScheduleCampaignInput,
+): Promise<Campaign> {
   const payload = await apiClient.patch<SingleCampaignResponse>(
     `/campaigns/${encodeURIComponent(campaignId)}/`,
     {
@@ -283,22 +291,55 @@ type HistoryPayload =
 
 type EmailPayload =
   | RawCampaignEmailEntry[]
-  | { results?: RawCampaignEmailEntry[]; data?: RawCampaignEmailEntry[]; emails?: RawCampaignEmailEntry[] };
+  | {
+      results?: RawCampaignEmailEntry[];
+      data?: RawCampaignEmailEntry[];
+      emails?: RawCampaignEmailEntry[];
+    };
 
 function historyRows(payload: HistoryPayload): RawCampaignHistoryEntry[] {
   if (Array.isArray(payload)) return payload;
   return payload.results ?? payload.data ?? payload.history ?? [];
 }
 
-function historySummary(payload: HistoryPayload, rows: RawCampaignHistoryEntry[]): CampaignHistorySummary {
-  const source = Array.isArray(payload) ? {} : (payload.summary ?? payload);
-  const sum = (key: keyof CampaignHistorySummary, aliases: string[], fallback: number) => {
-    const direct = source[key];
-    if (direct !== undefined) return numberValue(direct, fallback);
+/**
+ * Safe helper to read a numeric-ish value from an unknown-keyed record.
+ */
+function readNumber(source: Record<string, unknown>, key: string): number | undefined {
+  const value = source[key];
+  if (value === undefined || value === null || value === '') return undefined;
+  return numberValue(value);
+}
+
+function historySummary(
+  payload: HistoryPayload,
+  rows: RawCampaignHistoryEntry[],
+): CampaignHistorySummary {
+  // Normalize `source` to a single, string-indexable record type.
+  const source: Record<string, unknown> = Array.isArray(payload)
+    ? {}
+    : { ...(payload.summary ?? {}), ...payload };
+
+  const sum = (
+    key: keyof CampaignHistorySummary,
+    aliases: string[],
+    fallback: number,
+  ): number => {
+    // Try the camelCase key directly.
+    const direct = readNumber(source, key);
+    if (direct !== undefined) return direct;
+
+    // Try the snake_case equivalent.
+    const snakeKey = key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+    const snake = readNumber(source, snakeKey);
+    if (snake !== undefined) return snake;
+
+    // Try each alias.
     for (const alias of aliases) {
-      const candidate = (source as Record<string, unknown>)[alias];
-      if (candidate !== undefined) return numberValue(candidate, fallback);
+      const candidate = readNumber(source, alias);
+      if (candidate !== undefined) return candidate;
     }
+
     return fallback;
   };
 
@@ -331,7 +372,13 @@ export async function getCampaignHistory(campaignId: string): Promise<CampaignHi
   const rawRows = historyRows(payload);
   const entries = rawRows.map((entry, index) => ({
     id: entry.id ?? entry.history_id ?? index,
-    timestamp: entry.timestamp ?? entry.sent_at ?? entry.sentAt ?? entry.created_at ?? entry.createdAt ?? '',
+    timestamp:
+      entry.timestamp ??
+      entry.sent_at ??
+      entry.sentAt ??
+      entry.created_at ??
+      entry.createdAt ??
+      '',
     status: String(entry.status ?? entry.event ?? 'unknown'),
     listName: entry.list_name ?? entry.list ?? entry.group_name ?? undefined,
     blasted: numberValue(entry.blasted ?? entry.blast_count ?? entry.total_blasted),
@@ -344,11 +391,15 @@ export async function getCampaignHistory(campaignId: string): Promise<CampaignHi
   return { entries, summary: historySummary(payload, rawRows) };
 }
 
-export async function getCampaignHistoryEmails(historyId: string | number): Promise<CampaignEmailEntry[]> {
+export async function getCampaignHistoryEmails(
+  historyId: string | number,
+): Promise<CampaignEmailEntry[]> {
   const payload = await apiClient.get<EmailPayload>(
     `/mail-campaigns/history/${encodeURIComponent(String(historyId))}/emails/`,
   );
-  const rows = Array.isArray(payload) ? payload : payload.results ?? payload.data ?? payload.emails ?? [];
+  const rows = Array.isArray(payload)
+    ? payload
+    : payload.results ?? payload.data ?? payload.emails ?? [];
   return rows.map((row) => ({
     id: row.id,
     recipient: row.recipient ?? row.email ?? row.to ?? '—',
@@ -359,7 +410,11 @@ export async function getCampaignHistoryEmails(historyId: string | number): Prom
   }));
 }
 
-export async function sendTestEmail(payload: { to: string; subject: string; html: string }): Promise<unknown> {
+export async function sendTestEmail(payload: {
+  to: string;
+  subject: string;
+  html: string;
+}): Promise<unknown> {
   return apiClient.post('/send-test-mail/', { ...payload, attachments: [] });
 }
 
