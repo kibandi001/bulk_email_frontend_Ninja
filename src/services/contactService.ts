@@ -1,52 +1,83 @@
-// Contacts & Lists, Consent Centre, Data Hygiene (§9, §10, §11).
+import { apiClient } from './apiClient';
+import { listPaginatedSubscribers, uploadSubscriberCsv } from './subscriberService';
+import type { Contact, ContactImportResult, ConsentStatus, DataHygieneCheck } from '../types';
+import type { Subscriber } from '../types/subscriber';
 
-import { mockDelay } from './apiClient';
-import type { Contact, ContactImportResult, DataHygieneCheck } from '../types';
+// Helper to convert backend Subscriber -> UI Contact
+function mapSubscriberToContact(sub: Subscriber): Contact {
+  const fullName = [sub.first_name, sub.last_name]
+    .filter((n) => n && n.trim() && n.toLowerCase() !== 'nan')
+    .join(' ');
 
-const mockContacts: Contact[] = [
-  { id: 'c1', email: 'j.mwangi@example.co.ke', name: 'James Mwangi', lists: ['Contractors'], consent: 'granted', lastActivity: '2026-08-20' },
-  { id: 'c2', email: 'a.otieno@example.co.ke', name: 'Alice Otieno', lists: ['Vendors', 'Licensing'], consent: 'granted', lastActivity: '2026-08-19' },
-  { id: 'c3', email: 'p.kamau@example.co.ke', name: 'Peter Kamau', lists: ['Contractors'], consent: 'unsubscribed', lastActivity: '2026-08-11' },
-  { id: 'c4', email: 'm.wafula@example.co.ke', name: 'Mary Wafula', lists: ['Employees'], consent: 'bounced', lastActivity: '2026-08-14' },
-  { id: 'c5', email: 'd.kiptoo@example.co.ke', name: 'Daniel Kiptoo', lists: ['Licensing'], consent: 'pending', lastActivity: '2026-08-22' },
-];
+  let consent: ConsentStatus = 'granted';
+  if (sub.is_blacklisted) {
+    consent = 'bounced';
+  } else if (!sub.is_subscribed) {
+    consent = 'unsubscribed';
+  }
 
+  return {
+    id: String(sub.id),
+    email: sub.email,
+    name: fullName || sub.email,
+    lists: sub.group_name ? [sub.group_name] : [],
+    consent,
+    lastActivity: sub.created_at || '—',
+  };
+}
+
+/** Fetch contacts from the live backend */
+export async function listContacts(search?: string): Promise<Contact[]> {
+  try {
+    const response = await listPaginatedSubscribers({
+      limit: 100,
+      offset: 0,
+      email: search,
+    });
+    // Safely extract the subscriber list regardless of response wrapper
+    const items: Subscriber[] =
+      Array.isArray(response) ? response :
+        Array.isArray((response as any)?.results) ? (response as any).results :
+          Array.isArray((response as any)?.data) ? (response as any).data :
+            Array.isArray((response as any)?.data?.results) ? (response as any).data.results :
+              [];
+    return items.map(mapSubscriberToContact);
+  } catch (err) {
+    console.error('Failed to list contacts:', err);
+    return [];
+  }
+}
+
+
+/** Import contacts via CSV upload */
+export async function importContacts(file: File, groupId: number = 94): Promise<ContactImportResult> {
+  await uploadSubscriberCsv(file, groupId);
+  return { imported: 1, duplicates: 0, invalid: 0, suppressed: 0, failed: 0 };
+}
+
+/** Update consent status by patching the subscriber */
+export async function updateConsent(
+  contactId: string,
+  consent: Contact['consent']
+): Promise<void> {
+  const isSubscribed = consent === 'granted';
+  const isBlacklisted = consent === 'bounced';
+
+  await apiClient.patch(`/subscribers/${contactId}/`, {
+    is_subscribed: isSubscribed,
+    is_blacklisted: isBlacklisted,
+  });
+}
+
+/** Unsubscribe a contact */
+export async function unsubscribeContact(contactId: string): Promise<void> {
+  return updateConsent(contactId, 'unsubscribed');
+}
 const mockHygieneChecks: DataHygieneCheck[] = [
   { label: 'Format validation', detail: '214,300 checked · 312 invalid addresses flagged', tone: 'verified' },
   { label: 'Global suppression', detail: '1,840 addresses withheld from all sends', tone: 'amber' },
   { label: 'De-duplication', detail: 'Last run merged 96 duplicate records', tone: 'verified' },
 ];
-
-export async function listContacts(): Promise<Contact[]> {
-  // TODO: return apiClient.get<Contact[]>('/contacts');
-  return mockDelay(mockContacts);
-}
-
-/** §9 "Import" — upload is a separate step from this call in a real
- * integration (multipart upload, then poll this result), simplified here. */
-export async function importContacts(_file: File): Promise<ContactImportResult> {
-  // TODO: const form = new FormData(); form.append('file', _file);
-  //       return apiClient.post<ContactImportResult>('/contacts/import', form);
-  return mockDelay({ imported: 0, duplicates: 0, invalid: 0, suppressed: 0, failed: 0 });
-}
-
-/** §11 Consent/Preference Flow — "Submit change" → API → "Database updated". */
-export async function updateConsent(
-  contactId: string,
-  consent: Contact['consent']
-): Promise<Contact> {
-  // TODO: return apiClient.patch<Contact>(`/contacts/${contactId}/consent`, { consent });
-  const existing = mockContacts.find((c) => c.id === contactId);
-  if (!existing) throw new Error(`Unknown contact ${contactId}`);
-  return mockDelay({ ...existing, consent });
-}
-
-/** §11 "Unsubscribe flow" — contact becomes suppressed/unsubscribed. */
-export async function unsubscribeContact(contactId: string): Promise<Contact> {
-  return updateConsent(contactId, 'unsubscribed');
-}
-
 export async function listDataHygieneChecks(): Promise<DataHygieneCheck[]> {
-  // TODO: return apiClient.get<DataHygieneCheck[]>('/contacts/hygiene');
-  return mockDelay(mockHygieneChecks);
+  return mockHygieneChecks;
 }

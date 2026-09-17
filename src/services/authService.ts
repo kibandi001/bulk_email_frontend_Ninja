@@ -33,7 +33,7 @@
 import { apiClient, setTokens } from './apiClient';
 import type { AuthUser } from '../types';
 
-export class AuthError extends Error {}
+export class AuthError extends Error { }
 
 interface TokenPair {
   access: string;
@@ -51,15 +51,24 @@ interface RawUser {
 
 /** Shared with adminService.ts, which maps ManagedUser records the same way. */
 export function roleFromIsAdmin(isAdmin: boolean): AuthUser['role'] {
-  return isAdmin ? 'admin' : 'admin';
+  return isAdmin ? 'admin' : 'campaign_manager';
 }
 
-function mapUser(raw: RawUser): AuthUser {
+function mapUser(raw: any): AuthUser {
+  const user = raw?.data ?? raw;
+  const isAdmin = Boolean(user?.is_admin || user?.is_superuser || user?.role === 'admin');
+
+  //user email prefix if username is "N/A"
+  const displayName =
+    user?.username && user.username !== 'N/A' && user.username !== 'nan'
+      ? user.username
+      : user?.email?.split('@')[0] || 'User';
+
   return {
-    id: String(raw.id),
-    name: raw.username,
-    email: raw.email,
-    role: roleFromIsAdmin(raw.is_admin),
+    id: String(user?.id),
+    name: displayName,
+    email: user?.email,
+    role: roleFromIsAdmin(isAdmin),
     mfaVerified: true, // reaching this point means whichever login flow was used already completed.
   };
 }
