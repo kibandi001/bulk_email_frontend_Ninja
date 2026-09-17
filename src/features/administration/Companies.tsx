@@ -88,7 +88,7 @@ export function Companies() {
               <tr key={c.id}>
                 <td>{c.name}</td>
                 <td className="mono">{c.domain}</td>
-                <td className="mono">{c.allowedSenderEmails.join(', ') || '—'}</td>
+                
               </tr>
             ))}
           </tbody>
