@@ -70,12 +70,7 @@ interface RawManagedUser {
   id: number;
   email: string;
   username: string;
-  is_admin?: boolean;
-  isAdmin?: boolean;
-  is_superuser?: boolean;
-  role?: string;
-  roles?: string[];
-  groups?: (string | { name: string })[];
+  is_admin: boolean;
   company_id: number | null;
   phone: string | null;
 }
@@ -86,17 +81,14 @@ interface RawUserPage {
 }
 
 function mapManagedUser(raw: RawManagedUser): ManagedUser {
-  const isAdmin = Boolean(raw.is_admin ?? raw.isAdmin);
-  const isSuperuser = Boolean(raw.is_superuser);
-  const groups = raw.groups ?? raw.roles;
   return {
     id: raw.id,
     email: raw.email,
     username: raw.username,
-    isAdmin,
+    isAdmin: raw.is_admin,
     companyId: raw.company_id,
     phone: raw.phone,
-    role: roleFromIsAdmin(isAdmin, raw.role, groups, isSuperuser),
+    role: roleFromIsAdmin(raw.is_admin),
   };
 }
 
@@ -119,19 +111,19 @@ export async function getUser(id: number): Promise<ManagedUser> {
 
 /** PUT /users/list/ — full-record update; send back the fields that didn't change too. */
 export async function updateUser(
-  user: Pick<ManagedUser, 'id' | 'email' | 'username' | 'isAdmin' | 'companyId' | 'phone'>
+  user: Pick<ManagedUser, 'id' | 'email' | 'username' | 'isAdmin' | 'companyId' | 'phone' | 'fullName'>
 ): Promise<ManagedUser> {
-  const raw = await apiClient.put<RawManagedUser>('/users/list/', {
+  const raw = await apiClient.put<RawManagedUser>(`/users/list/?id=${user.id}`, {
     id: user.id,
     email: user.email,
     is_admin: user.isAdmin,
     username: user.username,
     company_id: user.companyId,
     phone: user.phone,
+    full_name: user.fullName,
   });
   return mapManagedUser(raw);
 }
-
 /** DELETE /users/list/?id= */
 export async function deleteUser(id: number): Promise<void> {
   await apiClient.delete<void>(`/users/list/?id=${id}`);

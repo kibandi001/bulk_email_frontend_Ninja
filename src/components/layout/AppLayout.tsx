@@ -4,7 +4,13 @@ import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import './AppLayout.css';
 
-export function AppLayout({ title, children }: { title: string; children: ReactNode }) {
+export function AppLayout({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem('nca_sidebar_collapsed') === 'true';
@@ -18,11 +24,13 @@ export function AppLayout({ title, children }: { title: string; children: ReactN
   const toggleSidebar = () => {
     setCollapsed((prev) => {
       const next = !prev;
+
       try {
         localStorage.setItem('nca_sidebar_collapsed', String(next));
       } catch {
         /* ignore */
       }
+
       return next;
     });
   };
@@ -32,17 +40,23 @@ export function AppLayout({ title, children }: { title: string; children: ReactN
       setMobileOpen((prev) => !prev);
       return;
     }
+
     toggleSidebar();
   };
 
   return (
-    <div className={`app-layout ${collapsed ? 'app-layout--collapsed' : ''} ${mobileOpen ? 'app-layout--mobile-open' : ''}`}>
+    <div
+      className={`app-layout ${
+        collapsed ? 'app-layout--collapsed' : ''
+      } ${mobileOpen ? 'app-layout--mobile-open' : ''}`}
+    >
       <Sidebar
         collapsed={collapsed}
         mobileOpen={mobileOpen}
         onToggle={handleSidebarToggle}
         onCloseMobile={() => setMobileOpen(false)}
       />
+
       {mobileOpen && (
         <button
           type="button"
@@ -51,8 +65,14 @@ export function AppLayout({ title, children }: { title: string; children: ReactN
           onClick={() => setMobileOpen(false)}
         />
       )}
+
       <div className="app-layout__main">
-        <Topbar title={title} collapsed={collapsed} onToggleSidebar={handleSidebarToggle} />
+        <Topbar
+          title={title}
+          collapsed={collapsed}
+          onToggleSidebar={handleSidebarToggle}
+        />
+
         <main className="app-layout__content">{children}</main>
       </div>
     </div>
