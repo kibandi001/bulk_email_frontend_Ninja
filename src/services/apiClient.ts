@@ -34,8 +34,23 @@ export class ApiError extends Error {
   }
 }
 
+const ACCESS_TOKEN_KEY = 'nca_access_token';
+const REFRESH_TOKEN_KEY = 'nca_refresh_token';
+
 let authToken: string | null = null;
 let refreshTokenValue: string | null = null;
+
+function readStoredTokens(): void {
+  try {
+    authToken = sessionStorage.getItem(ACCESS_TOKEN_KEY);
+    refreshTokenValue = sessionStorage.getItem(REFRESH_TOKEN_KEY);
+  } catch {
+    authToken = null;
+    refreshTokenValue = null;
+  }
+}
+
+readStoredTokens();
 
 interface TokenPair {
   access: string;
@@ -47,6 +62,19 @@ interface TokenPair {
 export function setTokens(tokens: TokenPair | null): void {
   authToken = tokens?.access ?? null;
   refreshTokenValue = tokens?.refresh ?? null;
+
+  try {
+    if (tokens) {
+      sessionStorage.setItem(ACCESS_TOKEN_KEY, tokens.access);
+      sessionStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh);
+    } else {
+      sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+      sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+    }
+  } catch {
+    // Storage can be unavailable in restricted browser contexts. In that case
+    // the in-memory token still keeps the current tab authenticated.
+  }
 }
 
 // Fired only when a session truly can't be salvaged (no refresh token, or the

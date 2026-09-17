@@ -49,26 +49,6 @@
   gap: 16px;
 }
 
-/* Session timer */
-
-.topbar__timer {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--muted);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 4px 7px;
-  white-space: nowrap;
-}
-
-.topbar__timer--low {
-  color: var(--alert);
-  border-color: var(--alert);
-}
-
 /* Profile */
 
 .topbar__profile {

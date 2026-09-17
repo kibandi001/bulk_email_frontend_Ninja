@@ -251,6 +251,30 @@
   vertical-align: middle;
 }
 
+
+/* Improve table readability with subtle zebra striping. */
+.campaign-studio__table tbody tr:nth-child(odd) {
+  background: var(--paper);
+}
+
+.campaign-studio__table tbody tr:nth-child(even) {
+  background: var(--paper-raised);
+}
+
+.campaign-studio__table tbody tr:hover {
+  background: var(--blueprint-dim);
+}
+
+.campaign-studio__campaign-subject--primary {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  display: block;
+  margin: 0;
+  max-width: 420px;
+  overflow-wrap: anywhere;
+}
+
 .campaign-studio__date-cell {
   white-space: nowrap;
   color: var(--muted);
@@ -839,4 +863,52 @@
   .campaign-studio__history-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .campaign-studio__history-stats > div:nth-child(3n) { border-right: 1px solid var(--line); }
   .campaign-studio__history-stats > div:nth-child(2n) { border-right: 0; }
+}
+
+/* Message-log / campaign-history email table */
+.message-log { display: grid; gap: 14px; }
+.message-log-card { overflow: hidden; }
+.message-log__campaign-filter { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.message-log__campaign-filter label,
+.message-log__field label { font-size: 12px; font-weight: 700; color: var(--muted); }
+.message-log__campaign-filter select,
+.message-log__field input { min-height: 40px; border: 1px solid var(--line-strong); border-radius: 6px; padding: 0 12px; background: var(--paper); color: var(--ink); }
+.message-log__campaign-filter select { min-width: 260px; }
+.message-log__filters { display: flex; align-items: end; gap: 18px; flex-wrap: wrap; padding: 2px 0 18px; }
+.message-log__field { display: grid; gap: 7px; min-width: 230px; }
+.message-log__filter-pills { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.message-log__pill { border: 0; border-radius: 999px; padding: 8px 13px; background: #e8e8ed; color: var(--ink); cursor: pointer; font-size: 12px; font-weight: 600; }
+.message-log__pill--active { background: #53506f; color: white; }
+.message-log__pill--search { background: #f44b44; color: white; }
+.message-log__pill--clear { background: #009f94; color: white; }
+.message-log__table-wrap { overflow: auto; }
+.message-log__table { min-width: 820px; }
+.message-log__table th { white-space: nowrap; }
+.message-log__error { padding: 12px 14px; border-radius: 8px; background: var(--alert-dim); color: var(--alert); }
+.message-log__empty { padding: 32px; text-align: center; color: var(--muted); }
+
+.campaign-studio__history-email-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 18px 0; flex-wrap: wrap; }
+.campaign-studio__history-email-heading { margin: 0; font-size: 14px; }
+.campaign-studio__history-email-heading span { color: var(--muted); font-weight: 400; }
+.campaign-studio__view-btn { border: 0; background: transparent; color: var(--blueprint); font-weight: 800; font-size: 12px; cursor: pointer; padding: 6px 2px; }
+.campaign-studio__view-btn:hover { text-decoration: underline; }
+@media (max-width: 780px) {
+  .message-log__campaign-filter { align-items: stretch; flex-direction: column; }
+  .message-log__campaign-filter select { width: 100%; }
+}
+.message-log__pill--export { background: #4caf50; color: white; }
+.message-log__pill--export:disabled { opacity: .5; cursor: not-allowed; }
+
+.message-log__date-field input[type='date'] { min-width: 155px; }
+@media (max-width: 760px) {
+  .message-log__date-field { min-width: 100%; }
+  .message-log__date-field input[type='date'] { width: 100%; }
+}
+
+.campaign-studio__filter-select[type='date'] {
+  color-scheme: light;
+}
+
+.campaign-studio__filter-row--date .campaign-studio__filter-select {
+  min-height: 34px;
 }

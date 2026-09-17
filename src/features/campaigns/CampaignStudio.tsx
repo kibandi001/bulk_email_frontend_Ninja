@@ -5,7 +5,6 @@ import {
   deleteCampaign,
   getCampaign,
   getCampaignHistory,
-  getCampaignHistoryEmails,
   listCampaigns,
   sendCampaign,
   scheduleCampaign,
@@ -13,14 +12,10 @@ import {
   updateCampaign,
   type CampaignHistoryEntry,
   type CampaignHistorySummary,
-  type CampaignEmailEntry,
 } from '../../services/campaignService';
 import { getTemplate, listTemplates } from '../../services/templateService';
-import {
-  getContactCountForGroup,
-  listGroups,
-} from '../../services/contactService';
 import type { Campaign, EmailTemplate } from '../../types';
+import { SentMailTable } from '../message-log/Messages';
 import { Card } from '../../components/ui/Card';
 import './CampaignStudio.css';
 
@@ -41,14 +36,11 @@ export function CampaignStudio() {
 
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
-  const [availableGroups, setAvailableGroups] = useState<string[]>([]);
 
   // Draft form state
   const [name, setName] = useState('');
   const [subject, setSubject] = useState('');
   const [templateId, setTemplateId] = useState<string>('');
-  const [targetGroup, setTargetGroup] = useState('All Subscribers');
-  const [customTarget, setCustomTarget] = useState('');
   const [abTest, setAbTest] = useState(false);
   const [body, setBody] = useState('');
   const [fromEmail, setFromEmail] = useState('');
@@ -72,18 +64,15 @@ export function CampaignStudio() {
   const [historyCampaign, setHistoryCampaign] = useState<CampaignDisplay | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyEmailEntry, setHistoryEmailEntry] = useState<CampaignHistoryEntry | null>(null);
-  const [historyEmails, setHistoryEmails] = useState<CampaignEmailEntry[]>([]);
-  const [historyEmailLoading, setHistoryEmailLoading] = useState(false);
-  const [historyEmailError, setHistoryEmailError] = useState<string | null>(null);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
-  const [selectedGroupFilter, setSelectedGroupFilter] =
-    useState<string>('all');
   const [sortBy, setSortBy] = useState<
     'newest' | 'name' | 'recipients'
   >('newest');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   async function reloadCampaigns() {
     const loaded = await listCampaigns();
@@ -93,7 +82,6 @@ export function CampaignStudio() {
 
   useEffect(() => {
     reloadCampaigns();
-    listGroups().then(setAvailableGroups);
   }, []);
 
   useEffect(() => {
@@ -125,8 +113,6 @@ export function CampaignStudio() {
         setBody(campaign.body || '');
         setFromEmail(campaign.fromEmail || '');
         setSender(campaign.sender || '');
-        setTargetGroup(campaign.targetGroup || 'All Subscribers');
-        setCustomTarget('');
         setAbTest(false);
         setContentMode(campaign.template ? 'template' : 'text');
         setTemplateId('');
@@ -148,24 +134,11 @@ export function CampaignStudio() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [historyId, campaigns]);
 
-  // Update recipient estimate when target group changes
   useEffect(() => {
-    const activeGroup =
-      targetGroup === '__custom__'
-        ? customTarget.trim()
-        : targetGroup;
-
-    if (!activeGroup) {
-      setRecipientEstimate(0);
-      return;
-    }
-
-    if (activeGroup.includes('@')) {
-      setRecipientEstimate(1);
-    } else {
-      getContactCountForGroup(activeGroup).then(setRecipientEstimate);
-    }
-  }, [targetGroup, customTarget]);
+    // Target group was removed from the Campaign Studio UI. Campaigns continue
+    // using the backend default audience while retaining the existing API shape.
+    setRecipientEstimate(null);
+  }, []);
 
   const selectedTemplate = templates.find(
     (t) => t.id === templateId
@@ -216,11 +189,7 @@ export function CampaignStudio() {
             .toLowerCase()
             .includes(q);
 
-          const matchGroup = c.targetGroup
-            ? c.targetGroup.toLowerCase().includes(q)
-            : false;
-
-          if (!matchName && !matchSubject && !matchGroup) {
+          if (!matchName && !matchSubject) {
             return false;
           }
         }
@@ -232,12 +201,18 @@ export function CampaignStudio() {
           return false;
         }
 
-        if (selectedGroupFilter !== 'all') {
-          if (
-            !c.targetGroup ||
-            c.targetGroup.toLowerCase() !==
-              selectedGroupFilter.toLowerCase()
-          ) {
+        if (dateFrom) {
+          const createdDate = c.createdAt ? new Date(c.createdAt) : null;
+          const fromDate = new Date(`${dateFrom}T00:00:00`);
+          if (!createdDate || Number.isNaN(createdDate.getTime()) || createdDate < fromDate) {
+            return false;
+          }
+        }
+
+        if (dateTo) {
+          const createdDate = c.createdAt ? new Date(c.createdAt) : null;
+          const toDate = new Date(`${dateTo}T23:59:59.999`);
+          if (!createdDate || Number.isNaN(createdDate.getTime()) || createdDate > toDate) {
             return false;
           }
         }
@@ -261,8 +236,9 @@ export function CampaignStudio() {
     campaigns,
     searchQuery,
     selectedStatus,
-    selectedGroupFilter,
     sortBy,
+    dateFrom,
+    dateTo,
   ]);
 
   async function handleSaveDraft() {
@@ -271,10 +247,6 @@ export function CampaignStudio() {
       return;
     }
 
-    const finalGroup =
-      targetGroup === '__custom__'
-        ? customTarget.trim()
-        : targetGroup;
 
     setIsSaving(true);
 
@@ -286,7 +258,7 @@ export function CampaignStudio() {
         fromEmail,
         sender,
         template: contentMode === 'template' ? templateId : '',
-        targetGroup: finalGroup || 'All Subscribers',
+        targetGroup: 'All Subscribers',
         abTest,
       };
 
@@ -333,7 +305,7 @@ export function CampaignStudio() {
       fromEmail,
       sender,
       template: contentMode === 'template' ? templateId : '',
-      targetGroup: targetGroup === '__custom__' ? customTarget.trim() : targetGroup,
+      targetGroup: 'All Subscribers',
       abTest,
     };
 
@@ -437,8 +409,9 @@ export function CampaignStudio() {
   function clearFilters() {
     setSearchQuery('');
     setSelectedStatus('all');
-    setSelectedGroupFilter('all');
     setSortBy('newest');
+    setDateFrom('');
+    setDateTo('');
   }
 
   function formatDateTime(value?: string | null) {
@@ -561,27 +534,15 @@ export function CampaignStudio() {
     }
   }
 
-  async function handleHistoryEmails(entry: CampaignHistoryEntry) {
+  function handleHistoryEmails(entry: CampaignHistoryEntry) {
+    // The email detail view now uses the campaign-level paginated sent-mail
+    // endpoint requested for Message Log. This makes the history "View"
+    // action show every email under the campaign id, not only one history id.
     setHistoryEmailEntry(entry);
-    setHistoryEmails([]);
-    setHistoryEmailError(null);
-    setHistoryEmailLoading(true);
-
-    try {
-      const emails = await getCampaignHistoryEmails(entry.id);
-      setHistoryEmails(emails);
-    } catch (error) {
-      setHistoryEmailError(error instanceof Error ? error.message : 'Could not load emails for this send.');
-    } finally {
-      setHistoryEmailLoading(false);
-    }
   }
 
   function closeHistoryEmails() {
     setHistoryEmailEntry(null);
-    setHistoryEmails([]);
-    setHistoryEmailError(null);
-    setHistoryEmailLoading(false);
   }
 
   function closeOverlay() {
@@ -603,7 +564,6 @@ export function CampaignStudio() {
         'Created At',
         'Sent At',
         'Subject',
-        'Target Group',
         'Email Status',
         'Delivery Status',
         'Recipients',
@@ -613,7 +573,6 @@ export function CampaignStudio() {
         campaign.createdAt || '',
         campaign.sentAt || '',
         campaign.subject,
-        campaign.targetGroup || 'All Subscribers',
         getEmailStatus(campaign),
         getDeliveryStatus(campaign),
         String(campaign.recipients ?? 0),
@@ -656,7 +615,8 @@ export function CampaignStudio() {
   const hasActiveFilters =
     searchQuery.trim() !== '' ||
     selectedStatus !== 'all' ||
-    selectedGroupFilter !== 'all';
+    dateFrom !== '' ||
+    dateTo !== '';
 
   return (
     <div className="campaign-studio">
@@ -680,7 +640,7 @@ export function CampaignStudio() {
                 ? 'Update the campaign details, save the changes, then schedule or send it.'
                 : historyCampaign
                   ? 'Review the campaign status and delivery events returned by the API.'
-                  : 'Build, preview and manage campaigns sent from mail.nca.ke. Target campaigns to specific subscriber groups or direct emails, filter active batches, or schedule new sends.'}
+                  : 'Build, preview and manage campaigns sent from mail.nca.ke. Filter active batches and schedule new sends from one place.'}
           </p>
 
           {selectedTemplate &&
@@ -749,7 +709,7 @@ export function CampaignStudio() {
               <div className="campaign-studio__search-bar">
                 <input
                   className="campaign-studio__search-input"
-                  placeholder="Search campaigns by name, subject, or group…"
+                  placeholder="Search campaigns by name or subject…"
                   value={searchQuery}
                   onChange={(e) =>
                     setSearchQuery(e.target.value)
@@ -799,42 +759,44 @@ export function CampaignStudio() {
                 ))}
               </div>
 
-              {/* Group + Sort */}
-              <div className="campaign-studio__filter-row">
+              {/* Date and sort filters */}
+              <div className="campaign-studio__filter-row campaign-studio__filter-row--date">
                 <div className="campaign-studio__filter-control">
                   <label
                     className="campaign-studio__filter-label"
-                    htmlFor="filter-group"
+                    htmlFor="campaign-date-from"
                   >
-                    Group:
+                    From:
                   </label>
-
-                  <select
-                    id="filter-group"
+                  <input
+                    id="campaign-date-from"
+                    type="date"
                     className="campaign-studio__filter-select"
-                    value={selectedGroupFilter}
-                    onChange={(e) =>
-                      setSelectedGroupFilter(
-                        e.target.value
-                      )
-                    }
-                  >
-                    <option value="all">
-                      All Groups
-                    </option>
-
-                    <option value="All Subscribers">
-                      All Subscribers
-                    </option>
-
-                    {availableGroups.map((g) => (
-                      <option key={g} value={g}>
-                        {g}
-                      </option>
-                    ))}
-                  </select>
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                  />
                 </div>
 
+                <div className="campaign-studio__filter-control">
+                  <label
+                    className="campaign-studio__filter-label"
+                    htmlFor="campaign-date-to"
+                  >
+                    To:
+                  </label>
+                  <input
+                    id="campaign-date-to"
+                    type="date"
+                    className="campaign-studio__filter-select"
+                    value={dateTo}
+                    min={dateFrom || undefined}
+                    onChange={(e) => setDateTo(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Sort */}
+              <div className="campaign-studio__filter-row">
                 <div className="campaign-studio__filter-control campaign-studio__filter-control--sort">
                   <label
                     className="campaign-studio__filter-label"
@@ -880,7 +842,6 @@ export function CampaignStudio() {
                     <th>Created At</th>
                     <th>Sent At</th>
                     <th>Campaign Subject</th>
-                    <th>Target Group</th>
                     <th>Email Status</th>
                     <th>Delivery Status</th>
                     <th className="campaign-studio__actions-cell">
@@ -918,27 +879,8 @@ export function CampaignStudio() {
 
                         {/* Subject */}
                         <td>
-                          <span className="campaign-studio__campaign-name">
-                            {campaign.name}
-                          </span>
-
-                          <span className="campaign-studio__campaign-subject">
+                          <span className="campaign-studio__campaign-subject campaign-studio__campaign-subject--primary">
                             {campaign.subject}
-                          </span>
-                        </td>
-
-                        {/* Group */}
-                        <td>
-                          <span
-                            className="campaign-studio__group-tag"
-                            title={
-                              campaign.targetGroup ||
-                              'All Subscribers'
-                            }
-                          >
-                            👥{' '}
-                            {campaign.targetGroup ||
-                              'All Subscribers'}
                           </span>
                         </td>
 
@@ -1185,84 +1127,6 @@ export function CampaignStudio() {
                 />
               </div>
 
-              <div className="field">
-                <label htmlFor="target-group">
-                  Target Audience / Group
-                </label>
-
-                <select
-                  id="target-group"
-                  value={targetGroup}
-                  onChange={(e) =>
-                    setTargetGroup(e.target.value)
-                  }
-                >
-                  <option value="All Subscribers">
-                    All Subscribers (Whole Audience)
-                  </option>
-
-                  {availableGroups.map((g) => (
-                    <option key={g} value={g}>
-                      Group: {g}
-                    </option>
-                  ))}
-
-                  <option value="__custom__">
-                    + Direct Email or Custom Group Name…
-                  </option>
-                </select>
-              </div>
-
-              {targetGroup === '__custom__' && (
-                <div className="field campaign-studio__custom-target">
-                  <label htmlFor="custom-target">
-                    Enter Email or Custom Group
-                  </label>
-
-                  <input
-                    id="custom-target"
-                    placeholder="e.g. contractor@nca.go.ke or VIP Contractors"
-                    value={customTarget}
-                    onChange={(e) =>
-                      setCustomTarget(e.target.value)
-                    }
-                  />
-
-                  <span className="campaign-studio__helper">
-                    You can send directly to a single email
-                    address or define a custom segment.
-                  </span>
-                </div>
-              )}
-
-              {recipientEstimate !== null && (
-                <div className="campaign-studio__audience-preview">
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                  </svg>
-
-                  <span>
-                    Estimated Audience:{' '}
-                    <strong>
-                      {recipientEstimate.toLocaleString()}
-                    </strong>{' '}
-                    recipient
-                    {recipientEstimate === 1
-                      ? ''
-                      : 's'}
-                  </span>
-                </div>
-              )}
 
               <div className="campaign-studio__content-choice">
                 <span className="campaign-studio__section-label">Email content</span>
@@ -1382,7 +1246,6 @@ export function CampaignStudio() {
             <div className="campaign-studio__history-summary">
               <span>Campaign: <strong>{name}</strong></span>
               <span>Subject: <strong>{subject}</strong></span>
-              <span>Audience: <strong>{targetGroup === '__custom__' ? customTarget : targetGroup}</strong></span>
               <span>Recipients: <strong>{(recipientEstimate ?? 0).toLocaleString()}</strong></span>
               {pendingAction === 'schedule' && scheduleChoice && <span>Schedule: <strong>{scheduleChoice}</strong></span>}
               {pendingAction === 'schedule' && scheduleStartDate && <span>Start: <strong>{scheduleStartDate} {scheduleTime}</strong></span>}
@@ -1454,7 +1317,7 @@ export function CampaignStudio() {
                         <td>{entry.id}</td>
                         <td>{formatHistoryDateTime(entry.timestamp)}</td>
                         <td><span className={getStatusClass(entry.status)}>{entry.status}</span></td>
-                        <td>{entry.listName || historyCampaign.targetGroup || '—'}</td>
+                        <td>{entry.listName || '—'}</td>
                         <td><span className="campaign-studio__metric-pill">{entry.blasted.toLocaleString()}</span></td>
                         <td><span className="campaign-studio__metric-pill campaign-studio__metric-pill--green">{entry.sent.toLocaleString()}</span></td>
                         <td><span className="campaign-studio__metric-pill">{entry.bounced.toLocaleString()}</span></td>
@@ -1463,16 +1326,12 @@ export function CampaignStudio() {
                         <td className="campaign-studio__actions-cell">
                           <button
                             type="button"
-                            className="campaign-studio__icon-btn"
-                            title={`View emails for send #${entry.id}`}
-                            aria-label={`View emails for send #${entry.id}`}
+                            className="campaign-studio__view-btn"
+                            title={`View emails for campaign ${historyCampaign.id}`}
+                            aria-label={`View emails for campaign ${historyCampaign.id}`}
                             onClick={() => handleHistoryEmails(entry)}
                           >
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                              <path d="M3.5 6.5h17v11h-17z" />
-                              <path d="m4 7 8 6 8-6" />
-                              <path d="M15 4.5h4" />
-                            </svg>
+                            View
                           </button>
                         </td>
                       </tr>
@@ -1485,45 +1344,19 @@ export function CampaignStudio() {
 
           {historyEmailEntry && (
             <div className="campaign-studio__history-overlay campaign-studio__history-overlay--nested" role="dialog" aria-modal="true" aria-labelledby="campaign-email-history-title">
-              <div className="campaign-studio__history-dialog campaign-studio__history-dialog--email">
+              <div className="campaign-studio__history-dialog campaign-studio__history-dialog--email campaign-studio__history-dialog--wide">
                 <div className="campaign-studio__history-header campaign-studio__history-header--purple">
                   <div className="campaign-studio__history-header-content">
                     <span className="campaign-studio__eyebrow">✉</span>
                     <div>
-                      <h2 id="campaign-email-history-title">Emails for Send #{historyEmailEntry.id}</h2>
+                      <h2 id="campaign-email-history-title">Campaign emails</h2>
+                      <p>{historyCampaign.name} · Campaign #{historyCampaign.id}</p>
                     </div>
                   </div>
-                  <button type="button" className="campaign-studio__alert-close campaign-studio__history-close" onClick={closeHistoryEmails} aria-label="Close email details">×</button>
+                  <button type="button" className="campaign-studio__alert-close campaign-studio__history-close" onClick={closeHistoryEmails} aria-label="Close campaign emails">×</button>
                 </div>
 
-                {historyEmailError ? (
-                  <div className="campaign-studio__alert campaign-studio__history-body-message">
-                    <strong>Email history unavailable.</strong> {historyEmailError}
-                  </div>
-                ) : historyEmailLoading ? (
-                  <div className="campaign-studio__history-empty">Loading emails…</div>
-                ) : historyEmails.length === 0 ? (
-                  <div className="campaign-studio__history-empty">No emails found for this send.</div>
-                ) : (
-                  <div className="campaign-studio__table-wrap campaign-studio__history-table-wrap">
-                    <table className="data-table campaign-studio__table campaign-studio__history-table">
-                      <thead>
-                        <tr><th>Recipient</th><th>Sent</th><th>Delivered</th><th>Opened</th><th>Clicked</th></tr>
-                      </thead>
-                      <tbody>
-                        {historyEmails.map((email, index) => (
-                          <tr key={email.id == null ? `${email.recipient}-${index}` : String(email.id)}>
-                            <td>{email.recipient}</td>
-                            <td>{email.sent}</td>
-                            <td>{email.delivered}</td>
-                            <td>{email.opened}</td>
-                            <td>{email.clicked}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                <SentMailTable campaignId={historyCampaign.id} showCampaignColumn={false} title={`All emails under ${historyCampaign.name}`} />
               </div>
             </div>
           )}

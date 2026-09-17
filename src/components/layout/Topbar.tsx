@@ -22,18 +22,12 @@ export function Topbar({
   collapsed,
   onToggleSidebar,
 }: TopbarProps) {
-  const { user, logout, sessionExpiresInMs } = useAuth();
+  const { user, logout } = useAuth();
 
   const [profileOpen, setProfileOpen] = useState(false);
 
   const profileRef = useRef<HTMLDivElement>(null);
 
-  const minutes = Math.floor(sessionExpiresInMs / 60000);
-  const seconds = Math.floor(
-    (sessionExpiresInMs % 60000) / 1000
-  );
-
-  const low = sessionExpiresInMs < 2 * 60 * 1000;
 
   /*
    * Build avatar initials from the email prefix.
@@ -228,44 +222,6 @@ export function Topbar({
 
       {/* Right side */}
       <div className="topbar__right">
-        {/* Session timer */}
-        <span
-          className={`topbar__timer${
-            low
-              ? ' topbar__timer--low'
-              : ''
-          }`}
-          title="Automatic sign-out after 15 minutes of inactivity"
-          aria-label={`Session timeout ${minutes} minutes ${seconds} seconds`}
-        >
-          <svg
-            width="13"
-            height="13"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <circle
-              cx="12"
-              cy="12"
-              r="9"
-            />
-
-            <polyline points="12 7 12 12 15 14" />
-          </svg>
-
-          <span>
-            {minutes}:
-            {seconds
-              .toString()
-              .padStart(2, '0')}
-          </span>
-        </span>
-
         {/* Profile */}
         {user && (
           <div

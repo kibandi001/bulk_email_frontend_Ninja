@@ -293,12 +293,14 @@ function historyRows(payload: HistoryPayload): RawCampaignHistoryEntry[] {
 }
 
 function historySummary(payload: HistoryPayload, rows: RawCampaignHistoryEntry[]): CampaignHistorySummary {
-  const source = Array.isArray(payload) ? {} : (payload.summary ?? payload);
+  const source: Record<string, unknown> = Array.isArray(payload)
+    ? {}
+    : ((payload.summary ?? payload) as Record<string, unknown>);
   const sum = (key: keyof CampaignHistorySummary, aliases: string[], fallback: number) => {
     const direct = source[key];
     if (direct !== undefined) return numberValue(direct, fallback);
     for (const alias of aliases) {
-      const candidate = (source as Record<string, unknown>)[alias];
+      const candidate = source[alias];
       if (candidate !== undefined) return numberValue(candidate, fallback);
     }
     return fallback;
