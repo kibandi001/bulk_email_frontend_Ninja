@@ -9,7 +9,7 @@ interface RawCompany {
   id: number;
   name: string;
   domain: string;
-  allowed_sender_emails: string[];
+  allowed_senders?: string[]; // backend returns allowed_senders
 }
 
 function mapCompany(raw: RawCompany): Company {
@@ -17,7 +17,7 @@ function mapCompany(raw: RawCompany): Company {
     id: raw.id,
     name: raw.name,
     domain: raw.domain,
-    allowedSenderEmails: raw.allowed_sender_emails,
+    allowedSenderEmails: raw.allowed_senders || [], //Maps allowed_senders to your UI
   };
 }
 
