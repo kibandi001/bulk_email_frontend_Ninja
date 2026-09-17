@@ -3,9 +3,8 @@
 // base URL only need to be right in one place.
 //
 // The platform's REST API is OAuth 2.0 bearer / scoped API key (inception
-// report §6.6). Until a backend is connected, individual service functions
-// resolve against local mock data via `mockDelay` instead of calling
-// `apiClient.*` — swapping one for the other is the whole migration.
+// report §6.6). Every service function now calls through apiClient.* — no
+// mock/local data layer remains.
 
 import { API_BASE_URL, MOCK_LATENCY_MS } from '../config/constants';
 
@@ -35,8 +34,23 @@ export class ApiError extends Error {
   }
 }
 
+const ACCESS_TOKEN_KEY = 'nca_access_token';
+const REFRESH_TOKEN_KEY = 'nca_refresh_token';
+
 let authToken: string | null = null;
 let refreshTokenValue: string | null = null;
+
+function readStoredTokens(): void {
+  try {
+    authToken = sessionStorage.getItem(ACCESS_TOKEN_KEY);
+    refreshTokenValue = sessionStorage.getItem(REFRESH_TOKEN_KEY);
+  } catch {
+    authToken = null;
+    refreshTokenValue = null;
+  }
+}
+
+readStoredTokens();
 
 interface TokenPair {
   access: string;
@@ -48,6 +62,19 @@ interface TokenPair {
 export function setTokens(tokens: TokenPair | null): void {
   authToken = tokens?.access ?? null;
   refreshTokenValue = tokens?.refresh ?? null;
+
+  try {
+    if (tokens) {
+      sessionStorage.setItem(ACCESS_TOKEN_KEY, tokens.access);
+      sessionStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh);
+    } else {
+      sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+      sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+    }
+  } catch {
+    // Storage can be unavailable in restricted browser contexts. In that case
+    // the in-memory token still keeps the current tab authenticated.
+  }
 }
 
 // Fired only when a session truly can't be salvaged (no refresh token, or the
@@ -135,9 +162,9 @@ export const apiClient = {
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 };
 
-// Resolves `value` after a simulated network delay. Used by the mock implementations in the other service files; replace the call site with the matching `apiClient.*` call once a real endpoint exists.
+export { SESSION_EXPIRED_EVENT };
+
+// Backwards-compatible helper used by the service layer for local/mock-only endpoints.
 export function mockDelay<T>(value: T, ms: number = MOCK_LATENCY_MS): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), ms));
 }
-
-export { SESSION_EXPIRED_EVENT };

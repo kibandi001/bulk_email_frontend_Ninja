@@ -6,14 +6,16 @@ export function Card({
   eyebrow,
   actions,
   children,
+  className,
 }: {
   title?: string;
   eyebrow?: string;
   actions?: ReactNode;
   children: ReactNode;
+  className?: string;
 }) {
   return (
-    <section className="card">
+    <section className={`card${className ? ` ${className}` : ''}`}>
       <span className="card__tick card__tick--tl" aria-hidden="true" />
       <span className="card__tick card__tick--br" aria-hidden="true" />
       {(title || actions) && (
