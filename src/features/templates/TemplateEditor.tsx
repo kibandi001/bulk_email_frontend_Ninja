@@ -387,6 +387,7 @@ export function TemplateEditor() {
             <div style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative', overflow: 'hidden' }}>
               {editorHeight != null && (
                 <EmailEditor
+                //fggfgf
                   // Remount when height changes so Unlayer re-sizes its iframe.
                   key={editorHeight}
                   ref={emailEditorRef}
