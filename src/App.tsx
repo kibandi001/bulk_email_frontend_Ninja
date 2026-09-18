@@ -267,10 +267,7 @@ function RequireRole({ roles, children }: { roles?: UserRole[]; children: ReactN
   const { hasRole } = useAuth();
   if (roles && !hasRole(...roles)) {
     return (
-      <div className="empty-state">
-        You don't have access to this area. Contact your NCA system administrator if you believe
-        this is incorrect.
-      </div>
+      <Navigate to="/" replace />
     );
   }
   return <>{children}</>;
