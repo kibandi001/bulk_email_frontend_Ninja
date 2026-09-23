@@ -21,4 +21,10 @@ export const LOCALE = 'en-KE';
 
 
 /** Simulated delay retained for service functions that still use local mock data. */
-export const MOCK_LATENCY_MS = 250;
+export const MOCK_LATENCY_MS = 0;
+
+
+//
+export const SUBSCRIBERS_WS_URL: string =
+  import.meta.env.VITE_SUBSCRIBERS_WS_URL ??
+  (API_BASE_URL ? API_BASE_URL.replace(/^http/, 'ws').replace(/\/api\/?$/, '') + '/ws/subscribers/' : '');

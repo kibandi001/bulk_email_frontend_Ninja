@@ -120,6 +120,11 @@ export async function deleteSubscriber(id: number): Promise<void> {
     await apiClient.delete(`/subscribers/${id}/`);
 }
 
+/** Unsubscribe a single subscriber (does not blacklist them) */
+export async function unsubscribeSubscriber(id: number): Promise<Subscriber> {
+    return updateSubscriber(id, { is_subscribed: false });
+}
+
 /** Bulk delete subscribers by IDs */
 export async function bulkDeleteSubscribers(ids: number[]): Promise<void> {
     await apiClient.post('/subscribers/bulk-delete/', { ids });
@@ -132,4 +137,60 @@ export async function uploadSubscriberCsv(file: File, groupId: number): Promise<
     formData.append('group_id', String(groupId));
 
     return apiClient.post('/subscribers/upload-csv/', formData);
+}
+
+// ----------------------------------------------------
+// CSV EXPORT
+// ----------------------------------------------------
+// There is no export endpoint in the Subscribers API collection, so this
+// builds the CSV client-side from whatever subscriber list is passed in
+// (same pattern as auditService.downloadAuditLog).
+
+/** Trigger a browser download of the given subscribers as a CSV file. */
+export function downloadSubscribersCsv(subscribers: Subscriber[]): void {
+    const header = ['Email', 'First Name', 'Last Name', 'Group', 'Subscribed', 'Blacklisted', 'Created At'];
+    const csv = [
+        header,
+        ...subscribers.map((s) => [
+            s.email,
+            s.first_name === 'nan' ? '' : s.first_name,
+            s.last_name === 'nan' ? '' : s.last_name,
+            s.group_name ?? '',
+            s.is_subscribed ? 'Yes' : 'No',
+            s.is_blacklisted ? 'Yes' : 'No',
+            s.created_at ?? '',
+        ]),
+    ]
+        .map((line) => line.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))
+        .join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `subscribers-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+}
+
+/** Fetch every subscriber matching the given filters (pages through, ignoring limit/offset). */
+export async function listAllSubscribers(
+    params: Omit<SubscriberFilterParams, 'limit' | 'offset'> = {}
+): Promise<Subscriber[]> {
+    const PAGE = 200;
+    let offset = 0;
+    const all: Subscriber[] = [];
+
+    while (true) {
+        const res = await listPaginatedSubscribers({ ...params, limit: PAGE, offset });
+        const items = Array.isArray(res) ? res : (res as any)?.results ?? (res as any)?.data ?? [];
+        all.push(...items);
+        const count = (res as any)?.count ?? all.length;
+        offset += PAGE;
+        if (items.length < PAGE || all.length >= count) break;
+    }
+
+    return all;
 }

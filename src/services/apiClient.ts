@@ -59,6 +59,9 @@ interface TokenPair {
 
 // Called by authService after login/OTP verification succeed, and on logout
 // (pass null to clear both tokens).
+export function getAccessToken(): string | null {
+  return authToken
+}
 export function setTokens(tokens: TokenPair | null): void {
   authToken = tokens?.access ?? null;
   refreshTokenValue = tokens?.refresh ?? null;

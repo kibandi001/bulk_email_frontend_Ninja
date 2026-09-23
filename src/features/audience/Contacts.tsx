@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useRef } from 'react';
 import {
   listPaginatedSubscribers,
@@ -6,7 +7,10 @@ import {
   updateSubscriber,
   deleteSubscriber,
   bulkDeleteSubscribers,
+  unsubscribeSubscriber,
   uploadSubscriberCsv,
+  downloadSubscribersCsv,
+  listAllSubscribers,
   createSubscriberGroup,
   updateSubscriberGroup,
   deleteSubscriberGroup,
@@ -14,6 +18,7 @@ import {
 import type { Subscriber, SubscriberGroup } from '../../types/subscriber';
 import { Card } from '../../components/ui/Card';
 import { StatusBadge } from '../../components/ui/StatusBadge';
+import { useSubscriberEvents } from '../../hooks/useSubscriberEvents';
 import './Contacts.css';
 
 export function Contacts() {
@@ -44,9 +49,10 @@ export function Contacts() {
   const [formIsBlacklisted, setFormIsBlacklisted] = useState(false);
   const [contactError, setContactError] = useState<string | null>(null);
 
-  // CSV Import
+  // CSV Import / Export
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   // ----------------------------------------------------
   // GROUPS STATE
@@ -75,8 +81,8 @@ export function Contacts() {
   }, []);
 
   // 2. Fetch Subscribers
-  function loadSubscribers() {
-    setLoading(true);
+  function loadSubscribers(opts: { silent?: boolean } = {}) {
+    if (!opts.silent) setLoading(true);
     const isSubscribed =
       statusFilter === 'subscribed' ? true : statusFilter === 'unsubscribed' ? false : undefined;
     const isBlacklisted = statusFilter === 'blacklisted' ? true : undefined;
@@ -93,10 +99,19 @@ export function Contacts() {
         const items = Array.isArray(res) ? res : res?.results ?? (res as any)?.data ?? [];
         setSubscribers(items);
         setTotalCount(res?.count ?? items.length);
-        setSelectedIds([]);
+        if (opts.silent) {
+          // Don't blow away the user's selection on a background refresh —
+          // just drop any ids that no longer exist in the refreshed list.
+          const stillPresent = new Set(items.map((i: Subscriber) => i.id));
+          setSelectedIds((prev) => prev.filter((id) => stillPresent.has(id)));
+        } else {
+          setSelectedIds([]);
+        }
       })
       .catch((err) => console.error('Failed to load subscribers:', err))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!opts.silent) setLoading(false);
+      });
   }
 
   useEffect(() => {
@@ -104,6 +119,37 @@ export function Contacts() {
       loadSubscribers();
     }
   }, [offset, selectedGroupId, statusFilter, activeTab]);
+
+  // Live-updating list. There's no CONFIRMED WebSocket/push endpoint for
+  // subscribers (see the ASSUMPTION note on SUBSCRIBERS_WS_URL) so this uses
+  // both a socket and a polling fallback rather than betting on one:
+  //  - useSubscriberEvents tries the socket and silently refetches on any
+  //    recognised change event.
+  //  - The interval below keeps polling as a safety net, but backs off to a
+  //    slow 60s "just in case" cadence once the socket reports connected,
+  //    and runs every 15s while the socket isn't (yet) available.
+  // Both are paused while a modal is open (can't clobber an in-progress
+  // add/edit) and off the Contacts tab.
+  const socketEnabled = activeTab === 'contacts' && !showAddModal && !editingSubscriber;
+  const { connected: socketConnected } = useSubscriberEvents({
+    enabled: socketEnabled,
+    onChange: () => loadSubscribers({ silent: true }),
+  });
+
+  const POLL_INTERVAL_MS = 15000;
+  const POLL_FALLBACK_MS = 60000;
+  useEffect(() => {
+    if (!socketEnabled) return;
+
+    const id = setInterval(
+      () => {
+        loadSubscribers({ silent: true });
+      },
+      socketConnected ? POLL_FALLBACK_MS : POLL_INTERVAL_MS
+    );
+
+    return () => clearInterval(id);
+  }, [socketEnabled, socketConnected, offset, selectedGroupId, statusFilter, search]);
 
   function handleSearchSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -191,6 +237,53 @@ export function Contacts() {
       loadGroups();
     } catch {
       alert('Failed to bulk delete contacts.');
+    }
+  }
+
+  async function handleUnsubscribeContact(id: number) {
+    if (!confirm('Unsubscribe this contact? They will stop receiving emails but stay in the list.')) return;
+    try {
+      await unsubscribeSubscriber(id);
+      loadSubscribers();
+    } catch {
+      alert('Failed to unsubscribe contact.');
+    }
+  }
+
+  async function handleBulkUnsubscribe() {
+    if (selectedIds.length === 0) return;
+    if (!confirm(`Unsubscribe ${selectedIds.length} selected contact(s)?`)) return;
+
+    try {
+      await Promise.all(selectedIds.map((id) => unsubscribeSubscriber(id)));
+      setSelectedIds([]);
+      loadSubscribers();
+    } catch {
+      alert('Failed to unsubscribe one or more contacts.');
+    }
+  }
+
+  // Exports every contact matching the current search/group/status filters,
+  // not just the current page — there's no backend export endpoint, so this
+  // pages through listPaginatedSubscribers client-side and builds the CSV.
+  async function handleExportCsv() {
+    setExporting(true);
+    try {
+      const isSubscribed =
+        statusFilter === 'subscribed' ? true : statusFilter === 'unsubscribed' ? false : undefined;
+      const isBlacklisted = statusFilter === 'blacklisted' ? true : undefined;
+
+      const all = await listAllSubscribers({
+        email: search || undefined,
+        group_id: selectedGroupId || undefined,
+        is_subscribed: isSubscribed,
+        is_blacklisted: isBlacklisted,
+      });
+      downloadSubscribersCsv(all);
+    } catch {
+      alert('Failed to export contacts.');
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -323,17 +416,35 @@ export function Contacts() {
         <Card
           title={`All Contacts (${totalCount.toLocaleString()})`}
           actions={
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <span
+                title={
+                  socketConnected
+                    ? 'Live updates connected — new changes appear automatically'
+                    : 'Live socket unavailable — refreshing periodically instead'
+                }
+                style={{ fontSize: 12, color: socketConnected ? '#1a7f37' : '#8a8a8a', marginRight: 4 }}
+              >
+                {socketConnected ? '● Live' : '○ Polling'}
+              </span>
               {selectedIds.length > 0 && (
-                <button className="btn btn--sm btn--danger" onClick={handleBulkDelete}>
-                  Delete ({selectedIds.length})
-                </button>
+                <>
+                  <button className="btn btn--sm" onClick={handleBulkUnsubscribe}>
+                    Unsubscribe ({selectedIds.length})
+                  </button>
+                  <button className="btn btn--sm btn--danger" onClick={handleBulkDelete}>
+                    Delete ({selectedIds.length})
+                  </button>
+                </>
               )}
               <button className="btn btn--primary" onClick={openAddContact}>
                 + Add Contact
               </button>
               <button className="btn" onClick={() => fileInputRef.current?.click()}>
                 Import CSV
+              </button>
+              <button className="btn" onClick={handleExportCsv} disabled={exporting}>
+                {exporting ? 'Exporting...' : 'Export CSV'}
               </button>
             </div>
           }
@@ -454,6 +565,15 @@ export function Contacts() {
                           >
                             Edit
                           </button>
+                          {c.is_subscribed && (
+                            <button
+                              className="btn btn--sm"
+                              onClick={() => handleUnsubscribeContact(c.id)}
+                              style={{ padding: '2px 8px', fontSize: 12 }}
+                            >
+                              Unsubscribe
+                            </button>
+                          )}
                           <button
                             className="btn btn--sm btn--danger"
                             onClick={() => handleDeleteContact(c.id)}
