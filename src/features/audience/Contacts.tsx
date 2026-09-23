@@ -378,6 +378,33 @@ export function Contacts() {
     }
   }
 
+  function resolveGroupName(sub: Subscriber): string {
+    if (sub.group_name) return sub.group_name;
+    if ((sub as any).list_name) return (sub as any).list_name;
+
+    if (sub.group_id) {
+      const match = groups.find((g) => g.id === sub.group_id);
+      if (match) return match.name;
+    }
+
+    if (Array.isArray(sub.groups) && sub.groups.length > 0) {
+      const matchedNames = sub.groups
+        .map((item: any) => {
+          if (typeof item === 'object' && item?.name) return item.name;
+          const found = groups.find((g) => g.id === Number(item));
+          return found ? found.name : null;
+        })
+        .filter(Boolean);
+
+      if (matchedNames.length > 0) {
+        return matchedNames.join(', ');
+      }
+    }
+
+    return '—';
+  }
+
+
   return (
     <div>
       <p className="section-intro">
@@ -551,7 +578,7 @@ export function Contacts() {
                       </td>
                       <td>{name}</td>
                       <td className="mono">{c.email}</td>
-                      <td>{c.group_name || '—'}</td>
+                      <td>{resolveGroupName(c)}</td>
                       <td>
                         <StatusBadge status={status} />
                       </td>

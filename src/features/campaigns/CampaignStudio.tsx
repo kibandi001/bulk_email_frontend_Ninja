@@ -18,6 +18,7 @@ import type { Campaign, EmailTemplate } from '../../types';
 import { SentMailTable } from '../message-log/Messages';
 import { Card } from '../../components/ui/Card';
 import './CampaignStudio.css';
+import { listPaginatedSubscribers } from '../../services/subscriberService';
 
 type CampaignDisplay = Campaign & {
   sentAt?: string | null;
@@ -116,6 +117,7 @@ export function CampaignStudio() {
         setAbTest(false);
         setContentMode(campaign.template ? 'template' : 'text');
         setTemplateId('');
+        setRecipientEstimate(campaign.recipients ?? 0);
       })
       .catch((error) => {
         alert(error instanceof Error ? error.message : 'Could not load campaign for editing.');
@@ -135,10 +137,12 @@ export function CampaignStudio() {
   }, [historyId, campaigns]);
 
   useEffect(() => {
-    // Target group was removed from the Campaign Studio UI. Campaigns continue
-    // using the backend default audience while retaining the existing API shape.
-    setRecipientEstimate(null);
-  }, []);
+    if (!editId){
+      listPaginatedSubscribers({ limit: 1, is_subscribed: true})
+      .then((res)=> setRecipientEstimate(res.count ?? 0))
+      .catch(()=> setRecipientEstimate(0)); 
+    }
+  }, [editId]);
 
   const selectedTemplate = templates.find(
     (t) => t.id === templateId
@@ -698,11 +702,10 @@ export function CampaignStudio() {
         <div className="campaign-studio__layout campaign-studio__layout--list">
           <Card
             className="campaign-studio__card"
-            title={`All campaigns (${filteredCampaigns.length}${
-              filteredCampaigns.length !== campaigns.length
+            title={`All campaigns (${filteredCampaigns.length}${filteredCampaigns.length !== campaigns.length
                 ? ` of ${campaigns.length}`
                 : ''
-            })`}
+              })`}
           >
             <div className="campaign-studio__controls">
               {/* Search */}
@@ -743,11 +746,10 @@ export function CampaignStudio() {
                   <button
                     key={st}
                     type="button"
-                    className={`campaign-studio__pill ${
-                      selectedStatus === st
+                    className={`campaign-studio__pill ${selectedStatus === st
                         ? 'campaign-studio__pill--active'
                         : ''
-                    }`}
+                      }`}
                     onClick={() => setSelectedStatus(st)}
                   >
                     <span>{st}</span>
@@ -812,9 +814,9 @@ export function CampaignStudio() {
                     onChange={(e) =>
                       setSortBy(
                         e.target.value as
-                          | 'newest'
-                          | 'name'
-                          | 'recipients'
+                        | 'newest'
+                        | 'name'
+                        | 'recipients'
                       )
                     }
                   >
