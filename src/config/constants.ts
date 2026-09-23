@@ -21,4 +21,4 @@ export const LOCALE = 'en-KE';
 
 
 /** Simulated delay retained for service functions that still use local mock data. */
-export const MOCK_LATENCY_MS = 250;
+// export const MOCK_LATENCY_MS = 250;
