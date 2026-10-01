@@ -235,7 +235,6 @@ import { Analytics } from './features/insight/Analytics';
 import { Quota } from './features/administration/Quota';
 import { Users } from './features/administration/Users';
 import { Companies } from './features/administration/Companies';
-import { Wallets } from './features/administration/Wallets';
 import { RequestLogs } from './features/administration/RequestLogs';
 import { AuditLog } from './features/administration/AuditLog';
 import { Messages } from './features/message-log/Messages';
@@ -258,7 +257,6 @@ const TITLES: Record<string, string> = {
   '/quota': 'Quota & Alerts',
   '/users': 'User Administration',
   '/companies': 'Companies',
-  '/wallets': 'Wallets',
   '/request-logs': 'Request Logs',
   '/roles': 'Roles & Permissions',
   '/audit': 'Audit Log',
@@ -276,8 +274,12 @@ function RequireRole({ roles, children }: { roles?: UserRole[]; children: ReactN
 }
 
 export default function App() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const location = useLocation();
+
+  if (loading) {
+    return <div className="empty-state">Restoring your session</div>;
+  }
 
   if (!user) {
     return (
@@ -375,14 +377,14 @@ export default function App() {
               </RequireRole>
             }
           />
-          <Route
+          {/* <Route
             path="/wallets"
             element={
               <RequireRole roles={['admin']}>
                 <Wallets />
               </RequireRole>
             }
-          />
+          /> */}
           <Route
             path="/request-logs"
             element={

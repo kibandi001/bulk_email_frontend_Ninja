@@ -140,12 +140,21 @@ export function TemplateEditor() {
   }
 
   function handleBuilderDone() {
-    emailEditorRef.current?.editor?.exportHtml((data: any) => {
+    emailEditorRef.current?.editor?.exportHtml((data: Parameters<Parameters<EditorRef['editor']['exportHtml']>[0]>[0]) => {
       const { design, html } = data;
       setDraft((d) => ({ ...d, bodyPreview: html, designJson: design }));
       setEditorMode('builder');
       setBuilderModalOpen(false);
     });
+
+    // Fix 2 (Recommended): Extract the internal type using the standard Unlayer namespace
+    // emailEditorRef.current?.editor?.exportHtml((data: Unlayer.ExportHtmlData) => {
+    //   const { design, html } = data;
+    //   setDraft((d) => ({ ...d, bodyPreview: html, designJson: design }));
+    //   setEditorMode('builder');
+    //   setBuilderModalOpen(false);
+    // });
+
   }
 
   async function persistDraft(finalDraft: TemplateDraft) {

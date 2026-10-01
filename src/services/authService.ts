@@ -30,7 +30,7 @@
 // refreshSession() below is just a manual trigger for that same mechanism,
 // kept in case some call site wants to force-validate a session explicitly.
 
-import { apiClient, setTokens } from './apiClient';
+import { apiClient, setTokens, getAccessToken } from './apiClient';
 import type { AuthUser } from '../types';
 
 export class AuthError extends Error { }
@@ -81,11 +81,33 @@ function mapUser(raw: any): AuthUser {
   };
 }
 
+const USER_KEY = 'nca_user';
+
+/** Last known user for this tab, only trusted while a token still exists. */
+export function getCachedUser(): AuthUser | null {
+  if (!getAccessToken()) return null;
+  try {
+    const raw = sessionStorage.getItem(USER_KEY);
+    return raw ? (JSON.parse(raw) as AuthUser) : null;
+  } catch {
+    return null;
+  }
+}
+
+function cacheUser(user: AuthUser): void {
+  try {
+    sessionStorage.setItem(USER_KEY, JSON.stringify(user));
+  } catch {
+    /* ignore */
+  }
+}
+
 async function fetchCurrentUser(): Promise<AuthUser> {
   const raw = await apiClient.get<RawUser>('/me/');
   console.log('[DEBUG authService] raw /me/ response:', raw);
   const mapped = mapUser(raw);
   console.log('[DEBUG authService] mapped AuthUser:', mapped);
+  cacheUser(mapped);
   return mapped;
 }
 
@@ -142,6 +164,11 @@ export async function refreshSession(): Promise<AuthUser> {
 
 export function invalidateSession(): void {
   setTokens(null);
+  try{
+    sessionStorage.removeItem(USER_KEY);
+  } catch {
+    // IGNORE
+  }
 }
 
 /** Password Reset, step 1: POST /password-reset-request/. Unauthenticated

@@ -50,10 +50,18 @@ export async function listContacts(search?: string): Promise<Contact[]> {
 
 
 /** Import contacts via CSV upload */
+// export async function importContacts(file: File, groupId: number = 94): Promise<ContactImportResult> {
+//   await uploadSubscriberCsv(file, groupId);
+//   return { imported: 1, duplicates: 0, invalid: 0, suppressed: 0, failed: 0 };
+// }
+
+// new
+/** Import contacts via CSV upload */
 export async function importContacts(file: File, groupId: number = 94): Promise<ContactImportResult> {
   await uploadSubscriberCsv(file, groupId);
-  return { imported: 1, duplicates: 0, updated: 0, invalid: 0, suppressed: 0, failed: 0 };
+  return { imported: 1, duplicates: 0, invalid: 0, suppressed: 0, failed: 0, updated: 0 };
 }
+
 
 /** Update consent status by patching the subscriber */
 export async function updateConsent(

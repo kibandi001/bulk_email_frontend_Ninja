@@ -19,7 +19,6 @@ export const SESSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
 /** Locale used for all date/number formatting across the console. */
 export const LOCALE = 'en-KE';
 
-
 /** Simulated delay retained for service functions that still use local mock data. */
 export const MOCK_LATENCY_MS = 0;
 
