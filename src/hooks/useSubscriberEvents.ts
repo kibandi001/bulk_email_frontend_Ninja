@@ -1,19 +1,5 @@
 // Live-update socket for the Contacts/Subscribers page.
-//
-// There is no confirmed push/socket endpoint for subscribers yet (see the
-// ASSUMPTION note on SUBSCRIBERS_WS_URL in config/constants.ts) — this hook
-// is written to the interface we *expect* the backend to eventually expose,
-// and degrades gracefully if that endpoint doesn't exist: it retries with
-// backoff, never throws, and just reports `connected: false` so the caller
-// (Contacts.tsx) can keep relying on its existing poll as a fallback.
-//
-// Message contract assumed (to be confirmed with the backend team):
-//   { "type": "subscriber.created" | "subscriber.updated" | "subscriber.deleted", ... }
-// We deliberately don't try to parse a full Subscriber payload out of the
-// message and patch state locally — the shape isn't confirmed, and a wrong
-// guess there would silently corrupt the list. Instead any recognised
-// message just triggers a refetch via onChange, the same as polling does,
-// so this is safe to ship even if the payload shape turns out different.
+
 
 import { useEffect, useRef, useState } from 'react';
 import { SUBSCRIBERS_WS_URL } from '../config/constants';
