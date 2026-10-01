@@ -235,7 +235,7 @@ import { Analytics } from './features/insight/Analytics';
 import { Quota } from './features/administration/Quota';
 import { Users } from './features/administration/Users';
 import { Companies } from './features/administration/Companies';
-import { Wallets } from './features/administration/Wallets';
+// import { Wallets } from './features/administration/Wallets';
 import { RequestLogs } from './features/administration/RequestLogs';
 import { AuditLog } from './features/administration/AuditLog';
 import { Messages } from './features/message-log/Messages';
@@ -258,7 +258,7 @@ const TITLES: Record<string, string> = {
   '/quota': 'Quota & Alerts',
   '/users': 'User Administration',
   '/companies': 'Companies',
-  '/wallets': 'Wallets',
+  // '/wallets': 'Wallets',
   '/request-logs': 'Request Logs',
   '/roles': 'Roles & Permissions',
   '/audit': 'Audit Log',
@@ -375,14 +375,14 @@ export default function App() {
               </RequireRole>
             }
           />
-          <Route
+          {/* <Route
             path="/wallets"
             element={
               <RequireRole roles={['admin']}>
                 <Wallets />
               </RequireRole>
             }
-          />
+          /> */}
           <Route
             path="/request-logs"
             element={
