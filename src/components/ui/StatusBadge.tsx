@@ -3,7 +3,8 @@ import './StatusBadge.css';
 type Tone = 'verified' | 'amber' | 'alert' | 'neutral' | 'blueprint';
 
 const TONE_MAP: Record<string, Tone> = {
-  granted: 'verified',
+  // granted: 'verified',
+  subscribed: 'verified',
   sent: 'verified',
   delivered: 'verified',
   unsubscribed: 'neutral',

@@ -42,6 +42,8 @@ export interface AuthUser {
   email: string;
   role: UserRole;
   mfaVerified: boolean;
+  companyId?: number | null;
+  companyName?: string | null;
 }
 
 // Shape returned by GET /users/list/ and GET /all-users/list/ (Tmail API,

@@ -126,9 +126,8 @@ export function Sidebar({
 
   return (
     <nav
-      className={`sidebar${collapsed ? ' sidebar--collapsed' : ''}${
-        mobileOpen ? ' sidebar--mobile-open' : ''
-      }`}
+      className={`sidebar${collapsed ? ' sidebar--collapsed' : ''}${mobileOpen ? ' sidebar--mobile-open' : ''
+        }`}
       aria-label="Primary"
     >
       <div className="sidebar__brand">
@@ -166,8 +165,7 @@ export function Sidebar({
                 to={item.to}
                 onClick={onCloseMobile}
                 className={({ isActive }) =>
-                  `sidebar__link${
-                    isActive ? ' sidebar__link--active' : ''
+                  `sidebar__link${isActive ? ' sidebar__link--active' : ''
                   }`
                 }
                 end={item.to === '/'}

@@ -64,12 +64,20 @@ function mapUser(raw: any): AuthUser {
       ? user.username
       : user?.email?.split('@')[0] || 'User';
 
+  const companyName =
+    user?.company_name ||
+    user?.company?.name ||
+    (typeof user?.company === 'string' ? user?.company : null);
+  const companyId = user?.company_id ?? user?.company?.id ?? null;
+
   return {
     id: String(user?.id),
     name: displayName,
     email: user?.email,
     role: roleFromIsAdmin(isAdmin),
     mfaVerified: true, // reaching this point means whichever login flow was used already completed.
+    companyId,
+    companyName,
   };
 }
 

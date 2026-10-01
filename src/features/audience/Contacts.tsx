@@ -564,7 +564,7 @@ export function Contacts() {
                   const status = c.is_blacklisted
                     ? 'bounced'
                     : c.is_subscribed
-                      ? 'granted'
+                      ? 'subscr'
                       : 'unsubscribed';
 
                   return (
