@@ -140,7 +140,7 @@ export function TemplateEditor() {
   }
 
   function handleBuilderDone() {
-    emailEditorRef.current?.editor?.exportHtml((data) => {
+    emailEditorRef.current?.editor?.exportHtml((data: any) => {
       const { design, html } = data;
       setDraft((d) => ({ ...d, bodyPreview: html, designJson: design }));
       setEditorMode('builder');

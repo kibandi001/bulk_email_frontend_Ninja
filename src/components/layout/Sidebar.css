@@ -53,7 +53,8 @@
 
   margin-bottom: 7px;
 
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid
+    rgba(255, 255, 255, 0.07);
 }
 
 .sidebar__brand {
@@ -141,7 +142,8 @@
   white-space: nowrap;
 }
 
-.sidebar--collapsed .sidebar__brand-copy {
+.sidebar--collapsed
+.sidebar__brand-copy {
   max-width: 0;
 
   opacity: 0;
@@ -208,7 +210,8 @@
  * The button remains visible at the top-right,
  * just like ChatGPT.
  */
-.sidebar:not(.sidebar--collapsed) .sidebar__toggle {
+.sidebar:not(.sidebar--collapsed)
+.sidebar__toggle {
   opacity: 0.82;
 }
 
@@ -216,13 +219,15 @@
  * Collapsed state:
  * Hide the button by default.
  */
-.sidebar--collapsed .sidebar__toggle {
+.sidebar--collapsed
+.sidebar__toggle {
   right: 50%;
 
   opacity: 0;
 
   transform:
-    translate(50%, -50%) scale(0.92);
+    translate(50%, -50%)
+    scale(0.92);
 
   pointer-events: none;
 }
@@ -231,11 +236,14 @@
  * When the mouse is over the top/brand area,
  * reveal the expand button.
  */
-.sidebar--collapsed .sidebar__header:hover .sidebar__toggle {
+.sidebar--collapsed
+.sidebar__header:hover
+.sidebar__toggle {
   opacity: 1;
 
   transform:
-    translate(50%, -50%) scale(1);
+    translate(50%, -50%)
+    scale(1);
 
   pointer-events: auto;
 }
@@ -244,7 +252,9 @@
  * While hovering the logo, slightly dim it so the
  * toggle becomes the obvious interaction.
  */
-.sidebar--collapsed .sidebar__header:hover .sidebar__brand-mark {
+.sidebar--collapsed
+.sidebar__header:hover
+.sidebar__brand-mark {
   opacity: 0.16;
 
   transform: scale(0.96);
@@ -267,7 +277,8 @@
   scrollbar-width: thin;
 
   scrollbar-color:
-    rgba(255, 255, 255, 0.13) transparent;
+    rgba(255, 255, 255, 0.13)
+    transparent;
 }
 
 .sidebar__scroll::-webkit-scrollbar {
@@ -324,7 +335,8 @@
     margin 0.18s ease;
 }
 
-.sidebar--collapsed .sidebar__group-label {
+.sidebar--collapsed
+.sidebar__group-label {
   max-height: 0;
 
   opacity: 0;
@@ -400,7 +412,8 @@
     transform 0.14s ease;
 }
 
-.sidebar__link:hover .sidebar__link-icon {
+.sidebar__link:hover
+.sidebar__link-icon {
   color: #fff;
 
   transform: scale(1.04);
@@ -428,7 +441,8 @@
    COLLAPSED LINKS
 ================================= */
 
-.sidebar--collapsed .sidebar__link {
+.sidebar--collapsed
+.sidebar__link {
   width: 44px;
 
   min-height: 42px;
@@ -442,7 +456,8 @@
   gap: 0;
 }
 
-.sidebar--collapsed .sidebar__link-text {
+.sidebar--collapsed
+.sidebar__link-text {
   max-width: 0;
 
   opacity: 0;
@@ -450,7 +465,8 @@
   pointer-events: none;
 }
 
-.sidebar--collapsed .sidebar__link:hover {
+.sidebar--collapsed
+.sidebar__link:hover {
   transform: none;
 }
 
@@ -485,7 +501,8 @@
   background: #63b3ed;
 }
 
-.sidebar__link--active .sidebar__link-icon {
+.sidebar__link--active
+.sidebar__link-icon {
   color: #63b3ed;
 }
 
@@ -494,12 +511,14 @@
     rgba(28, 90, 140, 0.39);
 }
 
-.sidebar--collapsed .sidebar__link--active {
+.sidebar--collapsed
+.sidebar__link--active {
   background:
     rgba(28, 90, 140, 0.45);
 }
 
-.sidebar--collapsed .sidebar__link--active::before {
+.sidebar--collapsed
+.sidebar__link--active::before {
   left: 2px;
 
   top: 9px;
@@ -511,7 +530,8 @@
 ================================= */
 
 @media (min-width: 861px) {
-  .sidebar--collapsed .sidebar__link:hover::after {
+  .sidebar--collapsed
+  .sidebar__link:hover::after {
     content: attr(title);
 
     position: absolute;
@@ -530,7 +550,8 @@
 
     background: #18212b;
 
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid
+      rgba(255, 255, 255, 0.08);
 
     border-radius: 6px;
 
@@ -540,7 +561,8 @@
     white-space: nowrap;
 
     box-shadow:
-      0 8px 20px rgba(0, 0, 0, 0.25);
+      0 8px 20px
+      rgba(0, 0, 0, 0.25);
 
     pointer-events: none;
   }
@@ -565,10 +587,12 @@
     padding: 12px;
 
     box-shadow:
-      12px 0 34px rgba(0, 0, 0, 0.22);
+      12px 0 34px
+      rgba(0, 0, 0, 0.22);
 
     transition:
-      transform 0.23s cubic-bezier(0.4, 0, 0.2, 1);
+      transform 0.23s
+      cubic-bezier(0.4, 0, 0.2, 1);
 
     z-index: 100;
   }
@@ -587,9 +611,12 @@
     padding: 12px;
   }
 
-  .sidebar--collapsed .sidebar__brand-copy,
-  .sidebar--collapsed .sidebar__group-label,
-  .sidebar--collapsed .sidebar__link-text {
+  .sidebar--collapsed
+  .sidebar__brand-copy,
+  .sidebar--collapsed
+  .sidebar__group-label,
+  .sidebar--collapsed
+  .sidebar__link-text {
     max-width: 190px;
 
     opacity: 1;
@@ -597,7 +624,8 @@
     pointer-events: auto;
   }
 
-  .sidebar--collapsed .sidebar__link {
+  .sidebar--collapsed
+  .sidebar__link {
     width: auto;
 
     min-height: 40px;
@@ -611,12 +639,14 @@
     gap: 11px;
   }
 
-  .sidebar--collapsed .sidebar__link--active {
+  .sidebar--collapsed
+  .sidebar__link--active {
     background:
       rgba(28, 90, 140, 0.32);
   }
 
-  .sidebar--collapsed .sidebar__link--active::before {
+  .sidebar--collapsed
+  .sidebar__link--active::before {
     left: 0;
   }
 
@@ -639,23 +669,30 @@
       translateY(-50%);
   }
 
-  .sidebar--collapsed .sidebar__toggle {
+  .sidebar--collapsed
+  .sidebar__toggle {
     right: 2px;
 
     opacity: 0.9;
 
     transform:
-      translateY(-50%) scale(1);
+      translateY(-50%)
+      scale(1);
 
     pointer-events: auto;
   }
 
-  .sidebar--collapsed .sidebar__header:hover .sidebar__toggle {
+  .sidebar--collapsed
+  .sidebar__header:hover
+  .sidebar__toggle {
     transform:
-      translateY(-50%) scale(1.03);
+      translateY(-50%)
+      scale(1.03);
   }
 
-  .sidebar--collapsed .sidebar__header:hover .sidebar__brand-mark {
+  .sidebar--collapsed
+  .sidebar__header:hover
+  .sidebar__brand-mark {
     opacity: 1;
 
     transform: none;
@@ -681,7 +718,6 @@
 ================================= */
 
 @media (prefers-reduced-motion: reduce) {
-
   .sidebar,
   .sidebar *,
   .sidebar *::before,
