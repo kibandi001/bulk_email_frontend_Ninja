@@ -3,7 +3,8 @@ import { QUOTA_THRESHOLDS } from '../../config/constants';
 import type { QuotaMetric } from '../../types';
 
 export function QuotaBar({ metric }: { metric: QuotaMetric }) {
-  const pct = Math.min(100, Math.round((metric.used / metric.limit) * 100));
+  // const pct = Math.min(100, Math.round((metric.used / metric.limit) * 100));
+  const pct = metric.limit > 0 ? Math.min(100, Math.round((metric.used / metric.limit) * 100)) : 0;
   const tone =
     pct >= QUOTA_THRESHOLDS.CRITICAL ? 'alert' : pct >= QUOTA_THRESHOLDS.WARNING ? 'amber' : 'verified';
   return (

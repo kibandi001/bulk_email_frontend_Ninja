@@ -1,0 +1,125 @@
+/* Fixed toast container on top-right */
+.toast-container {
+    position: fixed;
+    top: 72px;
+    /* right below the topbar */
+    right: 24px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 360px;
+    width: calc(100vw - 32px);
+    pointer-events: none;
+}
+
+/* Individual toast card */
+.toast-card {
+    pointer-events: auto;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    background: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.15), 0 2px 6px rgba(15, 23, 42, 0.08);
+    border-left: 5px solid #64748b;
+    animation: toastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform 0.2s, opacity 0.2s;
+}
+
+@keyframes toastSlideIn {
+    from {
+        transform: translateX(110%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.toast-card--success {
+    border-left-color: #10b981;
+}
+
+.toast-card--info {
+    border-left-color: #6366f1;
+}
+
+.toast-card--warning {
+    border-left-color: #f59e0b;
+}
+
+.toast-card--error {
+    border-left-color: #ef4444;
+}
+
+.toast-card__icon {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    margin-top: 1px;
+}
+
+.toast-card--success .toast-card__icon {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.toast-card--info .toast-card__icon {
+    background: #e0e7ff;
+    color: #4338ca;
+}
+
+.toast-card--warning .toast-card__icon {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.toast-card--error .toast-card__icon {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.toast-card__content {
+    flex: 1;
+    min-width: 0;
+}
+
+.toast-card__title {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 2px;
+}
+
+.toast-card__msg {
+    margin: 0;
+    font-size: 0.8rem;
+    color: #64748b;
+    line-height: 1.35;
+}
+
+.toast-card__close {
+    background: none;
+    border: none;
+    font-size: 0.95rem;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+    border-radius: 4px;
+}
+
+.toast-card__close:hover {
+    color: #1e293b;
+}

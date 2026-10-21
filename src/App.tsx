@@ -235,13 +235,14 @@ import { Analytics } from './features/insight/Analytics';
 import { Quota } from './features/administration/Quota';
 import { Users } from './features/administration/Users';
 import { Companies } from './features/administration/Companies';
-import { Wallets } from './features/administration/Wallets';
 import { RequestLogs } from './features/administration/RequestLogs';
 import { AuditLog } from './features/administration/AuditLog';
 import { Messages } from './features/message-log/Messages';
 import { Reports } from './features/reports/Reports';
 import { Roles } from './features/administration/Roles';
 import { SystemStatus } from './features/administration/SystemStatus';
+import { NotificationProvider } from './context/NotificationContext';
+import { ToastContainer } from './components/notifications/ToastContainer';
 import type { UserRole } from './types';
 
 const TITLES: Record<string, string> = {
@@ -256,7 +257,6 @@ const TITLES: Record<string, string> = {
   '/quota': 'Quota & Alerts',
   '/users': 'User Administration',
   '/companies': 'Companies',
-  '/wallets': 'Wallets',
   '/request-logs': 'Request Logs',
   '/roles': 'Roles & Permissions',
   '/audit': 'Audit Log',
@@ -267,18 +267,19 @@ function RequireRole({ roles, children }: { roles?: UserRole[]; children: ReactN
   const { hasRole } = useAuth();
   if (roles && !hasRole(...roles)) {
     return (
-      <div className="empty-state">
-        You don't have access to this area. Contact your NCA system administrator if you believe
-        this is incorrect.
-      </div>
+      <Navigate to="/" replace />
     );
   }
   return <>{children}</>;
 }
 
 export default function App() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const location = useLocation();
+
+  if (loading) {
+    return <div className="empty-state">Restoring your session</div>;
+  }
 
   if (!user) {
     return (
@@ -296,119 +297,122 @@ export default function App() {
     : (TITLES[location.pathname] ?? 'NCA Bulk Email Console');
 
   return (
-    <AppLayout title={title}>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route
-          path="/campaigns"
-          element={
-            <RequireRole roles={['admin', 'campaign_manager']}>
-              <CampaignStudio />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="/templates"
-          element={
-            <RequireRole roles={['admin', 'campaign_manager']}>
-              <TemplateLibrary />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="/templates/new"
-          element={
-            <RequireRole roles={['admin', 'campaign_manager']}>
-              <TemplateEditor />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="/templates/:id/edit"
-          element={
-            <RequireRole roles={['admin', 'campaign_manager']}>
-              <TemplateEditor />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="/contacts"
-          element={
-            <RequireRole roles={['admin', 'campaign_manager']}>
-              <Contacts />
-            </RequireRole>
-          }
-        />
-        <Route path="/hygiene" element={<DataHygiene />} />
-        <Route path="/analytics" element={<Analytics />} />
-        <Route
-          path="/reports"
-          element={
-            <RequireRole roles={['admin', 'campaign_manager', 'auditor']}>
-              <Reports />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="/messages"
-          element={
-            <RequireRole roles={['admin', 'campaign_manager', 'auditor']}>
-              <Messages />
-            </RequireRole>
-          }
-        />
-        <Route path="/quota" element={<Quota />} />
-        <Route
-          path="/users"
-          element={
-            <RequireRole roles={['admin']}>
-              <Users />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="/companies"
-          element={
-            <RequireRole roles={['admin']}>
-              <Companies />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="/wallets"
-          element={
-            <RequireRole roles={['admin']}>
-              <Wallets />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="/request-logs"
-          element={
-            <RequireRole roles={['admin', 'auditor']}>
-              <RequestLogs />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="/roles"
-          element={
-            <RequireRole roles={['admin']}>
-              <Roles />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="/audit"
-          element={
-            <RequireRole roles={['admin', 'auditor']}>
-              <AuditLog />
-            </RequireRole>
-          }
-        />
-        <Route path="/status" element={<SystemStatus />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </AppLayout>
+    <NotificationProvider>
+      <ToastContainer />
+      <AppLayout title={title}>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route
+            path="/campaigns"
+            element={
+              <RequireRole roles={['admin', 'campaign_manager']}>
+                <CampaignStudio />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/templates"
+            element={
+              <RequireRole roles={['admin', 'campaign_manager']}>
+                <TemplateLibrary />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/templates/new"
+            element={
+              <RequireRole roles={['admin', 'campaign_manager']}>
+                <TemplateEditor />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/templates/:id/edit"
+            element={
+              <RequireRole roles={['admin', 'campaign_manager']}>
+                <TemplateEditor />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/contacts"
+            element={
+              <RequireRole roles={['admin', 'campaign_manager']}>
+                <Contacts />
+              </RequireRole>
+            }
+          />
+          <Route path="/hygiene" element={<DataHygiene />} />
+          <Route path="/analytics" element={<Analytics />} />
+          <Route
+            path="/reports"
+            element={
+              <RequireRole roles={['admin', 'campaign_manager', 'auditor']}>
+                <Reports />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/messages"
+            element={
+              <RequireRole roles={['admin', 'campaign_manager', 'auditor']}>
+                <Messages />
+              </RequireRole>
+            }
+          />
+          <Route path="/quota" element={<Quota />} />
+          <Route
+            path="/users"
+            element={
+              <RequireRole roles={['admin']}>
+                <Users />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/companies"
+            element={
+              <RequireRole roles={['admin']}>
+                <Companies />
+              </RequireRole>
+            }
+          />
+          {/* <Route
+            path="/wallets"
+            element={
+              <RequireRole roles={['admin']}>
+                <Wallets />
+              </RequireRole>
+            }
+          /> */}
+          <Route
+            path="/request-logs"
+            element={
+              <RequireRole roles={['admin', 'auditor']}>
+                <RequestLogs />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/roles"
+            element={
+              <RequireRole roles={['admin']}>
+                <Roles />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/audit"
+            element={
+              <RequireRole roles={['admin', 'auditor']}>
+                <AuditLog />
+              </RequireRole>
+            }
+          />
+          <Route path="/status" element={<SystemStatus />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AppLayout>
+    </NotificationProvider>
   );
 }

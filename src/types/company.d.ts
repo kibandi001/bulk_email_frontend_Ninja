@@ -6,10 +6,12 @@ export interface Company {
   name: string;
   domain: string;
   allowedSenderEmails: string[];
+  logo?: string;
 }
 
 export interface CreateCompanyInput {
   name: string;
   domain: string;
   allowedSenderEmails: string[];
+  logo?: string;
 }

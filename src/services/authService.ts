@@ -30,10 +30,10 @@
 // refreshSession() below is just a manual trigger for that same mechanism,
 // kept in case some call site wants to force-validate a session explicitly.
 
-import { apiClient, setTokens } from './apiClient';
+import { apiClient, setTokens, getAccessToken } from './apiClient';
 import type { AuthUser } from '../types';
 
-export class AuthError extends Error {}
+export class AuthError extends Error { }
 
 interface TokenPair {
   access: string;
@@ -51,17 +51,55 @@ interface RawUser {
 
 /** Shared with adminService.ts, which maps ManagedUser records the same way. */
 export function roleFromIsAdmin(isAdmin: boolean): AuthUser['role'] {
-  return isAdmin ? 'admin' : 'admin';
+  return isAdmin ? 'admin' : 'campaign_manager';
 }
 
-function mapUser(raw: RawUser): AuthUser {
+function mapUser(raw: any): AuthUser {
+  const user = raw?.data ?? raw;
+  const isAdmin = Boolean(user?.is_admin || user?.is_superuser || user?.role === 'admin');
+
+  //user email prefix if username is "N/A"
+  const displayName =
+    user?.username && user.username !== 'N/A' && user.username !== 'nan'
+      ? user.username
+      : user?.email?.split('@')[0] || 'User';
+
+  const companyName =
+    user?.company_name ||
+    user?.company?.name ||
+    (typeof user?.company === 'string' ? user?.company : null);
+  const companyId = user?.company_id ?? user?.company?.id ?? null;
+
   return {
-    id: String(raw.id),
-    name: raw.username,
-    email: raw.email,
-    role: roleFromIsAdmin(raw.is_admin),
+    id: String(user?.id),
+    name: displayName,
+    email: user?.email,
+    role: roleFromIsAdmin(isAdmin),
     mfaVerified: true, // reaching this point means whichever login flow was used already completed.
+    companyId,
+    companyName,
   };
+}
+
+const USER_KEY = 'nca_user';
+
+/** Last known user for this tab, only trusted while a token still exists. */
+export function getCachedUser(): AuthUser | null {
+  if (!getAccessToken()) return null;
+  try {
+    const raw = sessionStorage.getItem(USER_KEY);
+    return raw ? (JSON.parse(raw) as AuthUser) : null;
+  } catch {
+    return null;
+  }
+}
+
+function cacheUser(user: AuthUser): void {
+  try {
+    sessionStorage.setItem(USER_KEY, JSON.stringify(user));
+  } catch {
+    /* ignore */
+  }
 }
 
 async function fetchCurrentUser(): Promise<AuthUser> {
@@ -69,6 +107,7 @@ async function fetchCurrentUser(): Promise<AuthUser> {
   console.log('[DEBUG authService] raw /me/ response:', raw);
   const mapped = mapUser(raw);
   console.log('[DEBUG authService] mapped AuthUser:', mapped);
+  cacheUser(mapped);
   return mapped;
 }
 
@@ -125,6 +164,11 @@ export async function refreshSession(): Promise<AuthUser> {
 
 export function invalidateSession(): void {
   setTokens(null);
+  try{
+    sessionStorage.removeItem(USER_KEY);
+  } catch {
+    // IGNORE
+  }
 }
 
 /** Password Reset, step 1: POST /password-reset-request/. Unauthenticated

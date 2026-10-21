@@ -34,7 +34,7 @@
 // RBAC identity, roles, and the permission matrix shape.
 // Populated by services/authService.ts and services/adminService.ts (§0.1.1, §16).
 
-export type UserRole = 'admin' | 'campaign_manager' | 'auditor' | 'app_integrator';
+export type UserRole = 'admin' | 'campaign_manager' | 'auditor' | 'app_integrator' | 'user';
 
 export interface AuthUser {
   id: string;
@@ -42,6 +42,8 @@ export interface AuthUser {
   email: string;
   role: UserRole;
   mfaVerified: boolean;
+  companyId?: number | null;
+  companyName?: string | null;
 }
 
 // Shape returned by GET /users/list/ and GET /all-users/list/ (Tmail API,

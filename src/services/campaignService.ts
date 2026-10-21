@@ -235,9 +235,16 @@ interface RawCampaignHistoryEntry {
   blasted?: number | string;
   blast_count?: number | string;
   total_blasted?: number | string;
+  number_sent?: number | string;
+  number_bounced?: number | string;
+  number_opened?: number | string;
+  number_clicked?: number | string;
+  recipient_count?: number | string;
   sent?: number | string;
   sent_count?: number | string;
   total_sent?: number | string;
+  total_number_sent?: number | string;
+  total_emails_sent?: number | string;
   bounced?: number | string;
   bounce_count?: number | string;
   total_bounced?: number | string;
@@ -271,17 +278,19 @@ interface RawCampaignEmailEntry {
 type HistoryPayload =
   | RawCampaignHistoryEntry[]
   | {
-      results?: RawCampaignHistoryEntry[];
-      data?: RawCampaignHistoryEntry[];
-      history?: RawCampaignHistoryEntry[];
-      summary?: Partial<CampaignHistorySummary> & Record<string, unknown>;
-      total_sends?: number | string;
-      total_blasted?: number | string;
-      total_sent?: number | string;
-      total_bounced?: number | string;
-      total_opened?: number | string;
-      total_clicked?: number | string;
-    };
+    results?: RawCampaignHistoryEntry[];
+    data?: RawCampaignHistoryEntry[];
+    history?: RawCampaignHistoryEntry[];
+    summary?: Partial<CampaignHistorySummary> & Record<string, unknown>;
+    total_sends?: number | string;
+    total_blasted?: number | string;
+    total_sent?: number | string;
+    total_number_sent?: number | string;
+    total_emails_sent?: number | string;
+    total_bounced?: number | string;
+    total_opened?: number | string;
+    total_clicked?: number | string;
+  };
 
 type EmailPayload =
   | RawCampaignEmailEntry[]
@@ -308,11 +317,11 @@ function historySummary(payload: HistoryPayload, rows: RawCampaignHistoryEntry[]
 
   const derived = rows.reduce(
     (acc, row) => {
-      acc.totalBlasted += numberValue(row.blasted ?? row.blast_count ?? row.total_blasted);
-      acc.totalSent += numberValue(row.sent ?? row.sent_count ?? row.total_sent);
-      acc.totalBounced += numberValue(row.bounced ?? row.bounce_count ?? row.total_bounced);
-      acc.totalOpened += numberValue(row.opened ?? row.open_count ?? row.total_opened);
-      acc.totalClicked += numberValue(row.clicked ?? row.click_count ?? row.total_clicked);
+      acc.totalBlasted += numberValue(row.blasted ?? row.blast_count ?? row.total_blasted ?? row.recipient_count);
+      acc.totalSent += numberValue(row.sent ?? row.sent_count ?? row.total_sent ?? row.number_sent ?? row.total_number_sent ?? 0);
+      acc.totalBounced += numberValue(row.bounced ?? row.bounce_count ?? row.total_bounced ?? row.number_bounced);
+      acc.totalOpened += numberValue(row.opened ?? row.open_count ?? row.total_opened ?? row.number_opened);
+      acc.totalClicked += numberValue(row.clicked ?? row.click_count ?? row.total_clicked ?? row.number_clicked);
       return acc;
     },
     { totalBlasted: 0, totalSent: 0, totalBounced: 0, totalOpened: 0, totalClicked: 0 },
@@ -320,11 +329,11 @@ function historySummary(payload: HistoryPayload, rows: RawCampaignHistoryEntry[]
 
   return {
     totalSends: sum('totalSends', ['total_sends', 'count'], rows.length),
-    totalBlasted: sum('totalBlasted', ['total_blasted'], derived.totalBlasted),
-    totalSent: sum('totalSent', ['total_sent'], derived.totalSent),
-    totalBounced: sum('totalBounced', ['total_bounced'], derived.totalBounced),
-    totalOpened: sum('totalOpened', ['total_opened'], derived.totalOpened),
-    totalClicked: sum('totalClicked', ['total_clicked'], derived.totalClicked),
+    totalBlasted: sum('totalBlasted', ['total_blasted', 'recipient_count'], derived.totalBlasted),
+    totalSent: sum('totalSent', ['total_sent', 'total_emails_sent', 'total_number_sent', 'number_sent'], derived.totalSent),
+    totalBounced: sum('totalBounced', ['total_bounced', 'number_bounced'], derived.totalBounced),
+    totalOpened: sum('totalOpened', ['total_opened', 'number_opened'], derived.totalOpened),
+    totalClicked: sum('totalClicked', ['total_clicked', 'number_clicked'], derived.totalClicked),
   };
 }
 
@@ -332,17 +341,20 @@ export async function getCampaignHistory(campaignId: string): Promise<CampaignHi
   const payload = await apiClient.get<HistoryPayload>(
     `/mail-campaigns/${encodeURIComponent(campaignId)}/history/`,
   );
+  console.log('CAMPAIGN HISTORY FULL ROW:', JSON.stringify((payload as any)?.data?.[0], null, 2));
+
+  // console.log('CAMPAIGN HISTORY PAYLOAD', JSON  .stringify(payload as any) null, 2));
   const rawRows = historyRows(payload);
   const entries = rawRows.map((entry, index) => ({
     id: entry.id ?? entry.history_id ?? index,
     timestamp: entry.timestamp ?? entry.sent_at ?? entry.sentAt ?? entry.created_at ?? entry.createdAt ?? '',
     status: String(entry.status ?? entry.event ?? 'unknown'),
     listName: entry.list_name ?? entry.list ?? entry.group_name ?? undefined,
-    blasted: numberValue(entry.blasted ?? entry.blast_count ?? entry.total_blasted),
-    sent: numberValue(entry.sent ?? entry.sent_count ?? entry.total_sent),
-    bounced: numberValue(entry.bounced ?? entry.bounce_count ?? entry.total_bounced),
-    clicked: numberValue(entry.clicked ?? entry.click_count ?? entry.total_clicked),
-    opened: numberValue(entry.opened ?? entry.open_count ?? entry.total_opened),
+    blasted: numberValue(entry.blasted ?? entry.blast_count ?? entry.total_blasted ?? entry.recipient_count),
+    sent: numberValue(entry.sent ?? entry.sent_count ?? entry.total_sent ?? entry.number_sent ?? entry.total_emails_sent ?? entry.total_number_sent),
+    bounced: numberValue(entry.bounced ?? entry.bounce_count ?? entry.total_bounced ?? entry.number_bounced),
+    clicked: numberValue(entry.clicked ?? entry.click_count ?? entry.total_clicked ?? entry.number_clicked),
+    opened: numberValue(entry.opened ?? entry.open_count ?? entry.total_opened ?? entry.number_opened),
   }));
 
   return { entries, summary: historySummary(payload, rawRows) };
