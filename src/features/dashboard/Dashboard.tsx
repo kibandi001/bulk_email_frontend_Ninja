@@ -5,7 +5,7 @@ import type { DashboardSummary } from '../../services/analyticsService';
 import { getCampaignStatsSummary } from '../../services/campaignStatsService';
 import type { CampaignStatsSummary } from '../../types/campaignStats';
 import { DateRangeFilter } from '../../components/ui/DateRangeFilter';
-
+import '../../features/dashboard/Dashboard.css';
 // Reused from the original dashboard tiles so the new layout still reads as
 // the same product: blue = sent/volume, purple = open engagement,
 // green = click engagement, amber = deliverability issues.
@@ -86,8 +86,8 @@ function StatCard({
 
 function Bar({ label, pct, displayValue, color }: { label: string; pct: number; displayValue: string; color: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-      <div style={{ width: 140, fontSize: 13, color: '#6b7280', flexShrink: 0, textAlign: 'right' }}>
+    <div className="dashboard__bar-row">
+      <div className="dashboard__bar-label">
         {label}
       </div>
       <div style={{ flex: 1, backgroundColor: '#f1f0eb', borderRadius: 6, height: 18, position: 'relative' }}>
@@ -213,14 +213,7 @@ export function Dashboard() {
       />
 
       {/* ===================== STAT CARDS ===================== */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-          gap: 16,
-          marginBottom: 20,
-        }}
-      >
+      <div className="dashboard__stats-grid">
         <StatCard icon="📧" accent={BLUE} label="Messages sent" value={totalSent.toLocaleString()} />
         <StatCard
           icon="📬"
@@ -243,7 +236,7 @@ export function Dashboard() {
       </div>
 
       {/* ===================== MAIN CONTENT ===================== */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 20 }}>
+      <div className="dashboard__main-grid">
         {/* ---- Campaign performance bars ---- */}
         <div
           style={{
@@ -261,7 +254,7 @@ export function Dashboard() {
             {range.startDate} to {range.endDate}
           </p>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 28 }}>
+          <div className="dashboard__performance-grid">
             <div>
               <h3
                 style={{
@@ -271,8 +264,7 @@ export function Dashboard() {
                   textTransform: 'uppercase',
                   letterSpacing: 0.6,
                   marginBottom: 14,
-                }}
-              >
+                }}>
                 Rates
               </h3>
               {rateMetrics.map((m) => (
@@ -387,14 +379,7 @@ export function Dashboard() {
       </div>
 
       {/* ===================== SECONDARY METRICS ===================== */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-          gap: 16,
-          marginTop: 20,
-        }}
-      >
+      <div className="dashboard__secondary-grid">
         {[
           { label: 'Total subscribers', value: stats?.totalSubscribers },
           { label: 'Total campaigns', value: stats?.totalCampaigns ?? summary?.completedCount },

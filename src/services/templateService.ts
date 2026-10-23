@@ -42,13 +42,23 @@ interface TMailTemplateRecord {
 }
 
 function fromTMailRecord(record: TMailTemplateRecord): EmailTemplate {
+  const rawName = record?.name;
+  const safeName =
+    !rawName || rawName === 'undefined' || rawName === 'null'
+      ? record?.id
+        ? `Template #${record.id}`
+        : 'Untitled Template'
+      : rawName;
+
+  const body = record?.content ?? '';
+
   return {
     id: String(record.id),
-    name: record.name,
-    updatedAt: record.updated_at ?? new Date().toISOString(),
-    subjectPreview: '', // TODO: TMail has no subject field — confirm if one exists or should be derived.
-    bodyPreview: record.content,
-    mergeFields: [...new Set(record.content.match(/{{\s*[\w.]+\s*}}/g) ?? [])],
+    name: safeName,
+    updatedAt: record.updated_at ?? record.created_at ?? new Date().toISOString(),
+    subjectPreview: '', // TMail API template records don't store subject directly
+    bodyPreview: body,
+    mergeFields: [...new Set(body.match(/{{\s*[\w.]+\s*}}/g) ?? [])],
   };
 }
 
@@ -57,7 +67,8 @@ function fromTMailRecord(record: TMailTemplateRecord): EmailTemplate {
 // createTemplate/updateTemplate each pass the right one.
 function toTMailFormData(draft: TemplateDraft, fileFieldName: 'files' | 'attachments'): FormData {
   const fd = new FormData();
-  fd.append('name', draft.name);
+  const safeName = draft.name.trim() || 'Untitled Template';
+  fd.append('name', safeName);
   fd.append('content', draft.bodyPreview);
   fd.append('json_data', JSON.stringify(draft.designJson ?? {}));
   for (const file of draft.files ?? []) {
@@ -68,7 +79,12 @@ function toTMailFormData(draft: TemplateDraft, fileFieldName: 'files' | 'attachm
 
 export async function listTemplates(): Promise<EmailTemplate[]> {
   const response = await apiClient.get<TMailListResponse>('/mail-templates/');
-  return response.data.map(fromTMailRecord);
+  const list = Array.isArray(response)
+    ? response
+    : Array.isArray(response?.data)
+    ? response.data
+    : (response as any)?.results ?? [];
+  return list.map(fromTMailRecord);
 }
 
 interface TMailSingleResponse {
@@ -99,8 +115,12 @@ export async function duplicateTemplate(id: string): Promise<EmailTemplate> {
   // No dedicated TMail endpoint for this — fetch the existing template and
   // recreate it under a tweaked name instead.
   const existing = await getTemplate(id);
+  const baseName =
+    !existing.name || existing.name === 'undefined'
+      ? `Template #${id}`
+      : existing.name;
   return createTemplate({
-    name: `${existing.name} (copy)`,
+    name: `${baseName} (copy)`,
     subjectPreview: existing.subjectPreview,
     bodyPreview: existing.bodyPreview,
     mergeFields: existing.mergeFields,

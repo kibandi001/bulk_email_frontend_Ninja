@@ -81,16 +81,17 @@ export function Contacts() {
   }, []);
 
   // 2. Fetch Subscribers
-  function loadSubscribers(opts: { silent?: boolean } = {}) {
+  function loadSubscribers(opts: { silent?: boolean; overrideEmail?: string } = {}) {
     if (!opts.silent) setLoading(true);
     const isSubscribed =
       statusFilter === 'subscribed' ? true : statusFilter === 'unsubscribed' ? false : undefined;
     const isBlacklisted = statusFilter === 'blacklisted' ? true : undefined;
+    const emailToUse = opts.overrideEmail !== undefined ? opts.overrideEmail : search;
 
     listPaginatedSubscribers({
       limit: PAGE_SIZE,
       offset,
-      email: search || undefined,
+      email: emailToUse.trim() || undefined,
       group_id: selectedGroupId || undefined,
       is_subscribed: isSubscribed,
       is_blacklisted: isBlacklisted,
@@ -151,11 +152,29 @@ export function Contacts() {
     return () => clearInterval(id);
   }, [socketEnabled, socketConnected, offset, selectedGroupId, statusFilter, search]);
 
-  function handleSearchSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function handleSearchSubmit(e?: React.FormEvent) {
+    if (e) e.preventDefault();
     setOffset(0);
     loadSubscribers();
   }
+
+  function handleClearSearch() {
+    setSearch('');
+    setOffset(0);
+    loadSubscribers({ overrideEmail: '' });
+  }
+
+  function handleResetFilters() {
+    setSearch('');
+    setSelectedGroupId('');
+    setStatusFilter('all');
+    setOffset(0);
+    loadSubscribers({ overrideEmail: '' });
+  }
+
+  const hasActiveFilters = Boolean(
+    search.trim() || selectedGroupId || statusFilter !== 'all'
+  );
 
   // ----------------------------------------------------
   // CONTACT ACTIONS
@@ -483,139 +502,228 @@ export function Contacts() {
           )}
 
           {/* Filters Bar */}
-          <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-            <form onSubmit={handleSearchSubmit} style={{ flex: 1, minWidth: 220 }}>
-              <input
-                placeholder="Search by email (press Enter)"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </form>
+          <div className="contacts__filter-bar">
+            <div className="contacts__filter-left">
+              {/* Search by Email */}
+              <form onSubmit={handleSearchSubmit} className="contacts__search-form">
+                <div className="contacts__search-wrap">
+                  <svg
+                    className="contacts__search-icon"
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  <input
+                    className="contacts__search-input"
+                    placeholder="Search by email…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                  {search && (
+                    <button
+                      type="button"
+                      className="contacts__search-clear"
+                      onClick={handleClearSearch}
+                      title="Clear email search"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  className="btn btn--primary"
+                  style={{ height: 36, padding: '0 14px', whiteSpace: 'nowrap' }}
+                >
+                  Search
+                </button>
+              </form>
 
-            <select
-              value={selectedGroupId}
-              onChange={(e) => {
-                setSelectedGroupId(e.target.value);
-                setOffset(0);
-              }}
-              style={{ minWidth: 180 }}
-            >
-              <option value="">All Groups</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name} ({g.num_subscribers ?? 0})
-                </option>
-              ))}
-            </select>
+              {/* Group Selector */}
+              <div className="contacts__select-wrap">
+                <svg
+                  className="contacts__select-icon"
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+                <select
+                  className="contacts__select"
+                  value={selectedGroupId}
+                  onChange={(e) => {
+                    setSelectedGroupId(e.target.value);
+                    setOffset(0);
+                  }}
+                  style={{ minWidth: 180 }}
+                  aria-label="Filter by group"
+                >
+                  <option value="">All Groups ({groups.length})</option>
+                  {groups.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name} ({g.num_subscribers ?? 0})
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value as any);
-                setOffset(0);
-              }}
-              style={{ minWidth: 150 }}
-            >
-              <option value="all">All Statuses</option>
-              <option value="subscribed">Subscribed</option>
-              <option value="unsubscribed">Unsubscribed</option>
-              <option value="blacklisted">Blacklisted</option>
-            </select>
+              {/* Status Selector */}
+              <div className="contacts__select-wrap">
+                <svg
+                  className="contacts__select-icon"
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <select
+                  className="contacts__select"
+                  value={statusFilter}
+                  onChange={(e) => {
+                    setStatusFilter(e.target.value as any);
+                    setOffset(0);
+                  }}
+                  style={{ minWidth: 155 }}
+                  aria-label="Filter by status"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="subscribed">Subscribed</option>
+                  <option value="unsubscribed">Unsubscribed</option>
+                  <option value="blacklisted">Blacklisted</option>
+                </select>
+              </div>
+            </div>
+
+            {hasActiveFilters && (
+              <button
+                type="button"
+                className="contacts__reset-btn"
+                onClick={handleResetFilters}
+                title="Reset all search and status filters"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 12a9 9 0 1 0 3-6.7" />
+                  <path d="M3 4v5h5" />
+                </svg>
+                Reset filters
+              </button>
+            )}
           </div>
 
           {/* Contacts Table */}
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th style={{ width: 36 }}>
-                  <input
-                    type="checkbox"
-                    checked={subscribers.length > 0 && selectedIds.length === subscribers.length}
-                    onChange={toggleSelectAll}
-                  />
-                </th>
-                <th>Name</th>
-                <th>Email</th>
-                <th>List / Group</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
+          <div className="table-responsive">
+            <table className="data-table">
+              <thead>
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: 24 }}>
-                    Loading contacts...
-                  </td>
+                  <th style={{ width: 36 }}>
+                    <input
+                      type="checkbox"
+                      checked={subscribers.length > 0 && selectedIds.length === subscribers.length}
+                      onChange={toggleSelectAll}
+                    />
+                  </th>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>List / Group</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th>Actions</th>
                 </tr>
-              ) : subscribers.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="empty-state">
-                    No contacts match the criteria.
-                  </td>
-                </tr>
-              ) : (
-                subscribers.map((c) => {
-                  const name =
-                    [c.first_name, c.last_name]
-                      .filter((n) => n && n !== 'nan')
-                      .join(' ') || '—';
-                  const status = c.is_blacklisted
-                    ? 'bounced'
-                    : c.is_subscribed
-                      ? 'subscribed'
-                      : 'unsubscribed';
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: 24 }}>
+                      Loading contacts...
+                    </td>
+                  </tr>
+                ) : subscribers.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="empty-state">
+                      No contacts match the criteria.
+                    </td>
+                  </tr>
+                ) : (
+                  subscribers.map((c) => {
+                    const name =
+                      [c.first_name, c.last_name]
+                        .filter((n) => n && n !== 'nan')
+                        .join(' ') || '—';
+                    const status = c.is_blacklisted
+                      ? 'bounced'
+                      : c.is_subscribed
+                        ? 'subscribed'
+                        : 'unsubscribed';
 
-                  return (
-                    <tr key={`${c.id}-${c.group_id ?? 0}`}>
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(c.id)}
-                          onChange={() => toggleSelectRow(c.id)}
-                        />
-                      </td>
-                      <td>{name}</td>
-                      <td className="mono">{c.email}</td>
-                      <td>{resolveGroupName(c)}</td>
-                      <td>
-                        <StatusBadge status={status} />
-                      </td>
-                      <td className="mono">{c.created_at || '—'}</td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button
-                            className="btn btn--sm"
-                            onClick={() => openEditContact(c)}
-                            style={{ padding: '2px 8px', fontSize: 12 }}
-                          >
-                            Edit
-                          </button>
-                          {c.is_subscribed && (
+                    return (
+                      <tr key={`${c.id}-${c.group_id ?? 0}`}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(c.id)}
+                            onChange={() => toggleSelectRow(c.id)}
+                          />
+                        </td>
+                        <td>{name}</td>
+                        <td className="mono">{c.email}</td>
+                        <td>{resolveGroupName(c)}</td>
+                        <td>
+                          <StatusBadge status={status} />
+                        </td>
+                        <td className="mono">{c.created_at || '—'}</td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 6 }}>
                             <button
                               className="btn btn--sm"
-                              onClick={() => handleUnsubscribeContact(c.id)}
+                              onClick={() => openEditContact(c)}
                               style={{ padding: '2px 8px', fontSize: 12 }}
                             >
-                              Unsubscribe
+                              Edit
                             </button>
-                          )}
-                          <button
-                            className="btn btn--sm btn--danger"
-                            onClick={() => handleDeleteContact(c.id)}
-                            style={{ padding: '2px 8px', fontSize: 12 }}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                            {c.is_subscribed && (
+                              <button
+                                className="btn btn--sm"
+                                onClick={() => handleUnsubscribeContact(c.id)}
+                                style={{ padding: '2px 8px', fontSize: 12 }}
+                              >
+                                Unsubscribe
+                              </button>
+                            )}
+                            <button
+                              className="btn btn--sm btn--danger"
+                              onClick={() => handleDeleteContact(c.id)}
+                              style={{ padding: '2px 8px', fontSize: 12 }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
 
           {/* Pagination */}
           <div
@@ -665,61 +773,63 @@ export function Contacts() {
             </button>
           }
         >
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Group Name</th>
-                <th>Description</th>
-                <th>Subscribers</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {groupsLoading ? (
+          <div className="table-responsive">
+            <table className="data-table">
+              <thead>
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: 24 }}>
-                    Loading groups...
-                  </td>
+                  <th>ID</th>
+                  <th>Group Name</th>
+                  <th>Description</th>
+                  <th>Subscribers</th>
+                  <th>Created</th>
+                  <th>Actions</th>
                 </tr>
-              ) : groups.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="empty-state">
-                    No subscriber groups created yet.
-                  </td>
-                </tr>
-              ) : (
-                groups.map((g) => (
-                  <tr key={g.id}>
-                    <td className="mono">{g.id}</td>
-                    <td style={{ fontWeight: 600 }}>{g.name}</td>
-                    <td>{g.description || '—'}</td>
-                    <td className="mono">{g.num_subscribers?.toLocaleString() ?? 0}</td>
-                    <td className="mono">{g.created_at || '—'}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button
-                          className="btn btn--sm"
-                          onClick={() => openEditGroup(g)}
-                          style={{ padding: '2px 8px', fontSize: 12 }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="btn btn--sm btn--danger"
-                          onClick={() => handleDeleteGroup(g.id)}
-                          style={{ padding: '2px 8px', fontSize: 12 }}
-                        >
-                          Delete
-                        </button>
-                      </div>
+              </thead>
+              <tbody>
+                {groupsLoading ? (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: 24 }}>
+                      Loading groups...
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : groups.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="empty-state">
+                      No subscriber groups created yet.
+                    </td>
+                  </tr>
+                ) : (
+                  groups.map((g) => (
+                    <tr key={g.id}>
+                      <td className="mono">{g.id}</td>
+                      <td style={{ fontWeight: 600 }}>{g.name}</td>
+                      <td>{g.description || '—'}</td>
+                      <td className="mono">{g.num_subscribers?.toLocaleString() ?? 0}</td>
+                      <td className="mono">{g.created_at || '—'}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            className="btn btn--sm"
+                            onClick={() => openEditGroup(g)}
+                            style={{ padding: '2px 8px', fontSize: 12 }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="btn btn--sm btn--danger"
+                            onClick={() => handleDeleteGroup(g.id)}
+                            style={{ padding: '2px 8px', fontSize: 12 }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </Card>
       )}
 

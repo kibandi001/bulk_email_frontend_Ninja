@@ -2,10 +2,21 @@
   display: grid;
   gap: 18px;
 }
-.grid--2 { grid-template-columns: repeat(2, 1fr); }
-.grid--3 { grid-template-columns: repeat(3, 1fr); }
+
+.grid--2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.grid--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
 @media (max-width: 960px) {
-  .grid--2, .grid--3 { grid-template-columns: 1fr; }
+
+  .grid--2,
+  .grid--3 {
+    grid-template-columns: 1fr;
+  }
 }
 
 .stat {
@@ -13,11 +24,13 @@
   flex-direction: column;
   gap: 4px;
 }
+
 .stat__value {
   font-family: var(--font-mono);
   font-size: 26px;
   font-weight: 600;
 }
+
 .stat__label {
   font-size: 12.5px;
   color: var(--muted);
@@ -25,9 +38,19 @@
 
 table.data-table {
   width: 100%;
+  min-width: 720px;
   border-collapse: collapse;
   font-size: 13.5px;
 }
+
+.table-responsive,
+.table-container {
+  overflow-x: auto;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
+  min-width: 0;
+}
+
 .data-table th {
   text-align: left;
   font-family: var(--font-mono);
@@ -38,13 +61,21 @@ table.data-table {
   padding: 0 10px 8px;
   border-bottom: 1px solid var(--line);
 }
+
 .data-table td {
   padding: 10px 10px;
   border-bottom: 1px solid var(--line);
   vertical-align: middle;
 }
-.data-table tr:last-child td { border-bottom: none; }
-.data-table td.mono { font-family: var(--font-mono); font-size: 12.5px; }
+
+.data-table tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table td.mono {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
 
 .btn {
   font-size: 13px;
@@ -55,13 +86,20 @@ table.data-table {
   color: var(--ink);
   cursor: pointer;
 }
-.btn:hover { background: var(--paper); }
+
+.btn:hover {
+  background: var(--paper);
+}
+
 .btn--primary {
   background: var(--blueprint);
   border-color: var(--blueprint);
   color: #fff;
 }
-.btn--primary:hover { background: #16456b; }
+
+.btn--primary:hover {
+  background: #16456b;
+}
 
 .field {
   display: flex;
@@ -69,10 +107,12 @@ table.data-table {
   gap: 5px;
   margin-bottom: 14px;
 }
+
 .field label {
   font-size: 12.5px;
   color: var(--muted);
 }
+
 .field input,
 .field select,
 .field textarea {

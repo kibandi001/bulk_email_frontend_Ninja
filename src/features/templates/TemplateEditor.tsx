@@ -13,6 +13,9 @@ import {
 import type { TemplateDraft, TemplateValidationIssue } from '../../types';
 import { Card } from '../../components/ui/Card';
 
+// Rough shape check for Unlayer's design JSON before handing it back to
+// loadDesign() — designJson is persisted/round-tripped data, so this guards
+// against a stale or corrupted record crashing the editor at load time.
 const JSONTemplateEmailSchema = z.object({
   counters: z.record(z.string(), z.number()),
   body: z.record(z.string(), z.any()),
@@ -43,7 +46,7 @@ export function TemplateEditor() {
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const emailEditorRef = useRef<EditorRef>(null);
   const builderHeaderRef = useRef<HTMLDivElement>(null);
-  const [editorHeight, setEditorHeight] = useState<number | null>(null);
+  const [editorMinHeight, setEditorMinHeight] = useState<number | null>(null);
 
   const [draft, setDraft] = useState<TemplateDraft>(emptyDraft);
   const [editorMode, setEditorMode] = useState<EditorMode>('simple');
@@ -67,6 +70,8 @@ export function TemplateEditor() {
       .catch(() => setLoadError('Could not load that template.'));
   }, [id]);
 
+  // Close the builder modal on Escape (without saving its contents — same
+  // as clicking the overlay). Use "Done" inside the modal to keep changes.
   useEffect(() => {
     if (!builderModalOpen) return;
     function onKeyDown(e: KeyboardEvent) {
@@ -76,26 +81,22 @@ export function TemplateEditor() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [builderModalOpen]);
 
-  // react-email-editor sizes its internal Unlayer iframe once, on mount,
-  // using `minHeight` / `style.height`. There is no public layout()/resize()
-  // method in its type definitions, so the only reliable way to give the
-  // editor the right size is to compute a concrete pixel height before it
-  // mounts and pass it in.
-  //
-  // We measure the modal header after layout (rAF, because the ref isn't
-  // attached on the first render tick) and derive the body height from the
-  // modal's fixed 90vh.
+  // react-email-editor only applies `minHeight` when the underlying iframe
+  // is first created — changing the prop after mount (e.g. from a
+  // ResizeObserver) has no effect on an already-mounted editor. So instead
+  // of measuring the editor's own container (which doesn't exist until
+  // after this runs), measure the header's real height synchronously
+  // before paint and derive the content height from the modal's own fixed
+  // 90vh, then delay mounting <EmailEditor> until that number is known —
+  // so its very first mount already gets the right pixel height.
   useLayoutEffect(() => {
     if (!builderModalOpen) {
-      setEditorHeight(null);
+      setEditorMinHeight(null); // remeasure fresh next time the modal opens
       return;
     }
-    const raf = requestAnimationFrame(() => {
-      const headerHeight = builderHeaderRef.current?.getBoundingClientRect().height ?? 57;
-      const modalHeight = window.innerHeight * 0.9;
-      setEditorHeight(Math.max(500, Math.round(modalHeight - headerHeight)));
-    });
-    return () => cancelAnimationFrame(raf);
+    const headerHeight = builderHeaderRef.current?.getBoundingClientRect().height ?? 57;
+    const modalHeight = window.innerHeight * 0.9; // matches the modal box's `height: '90vh'`
+    setEditorMinHeight(Math.max(300, Math.round(modalHeight - headerHeight)));
   }, [builderModalOpen]);
 
   const onEmailEditorReady: EmailEditorProps['onReady'] = () => {
@@ -139,22 +140,17 @@ export function TemplateEditor() {
     setIssues(validateTemplate(draft));
   }
 
+  // Pulls the current design out of Unlayer and commits it into `draft`,
+  // then closes the modal. This is the only path that writes builder
+  // content back into draft — closing via Escape/overlay/X discards
+  // whatever's in the editor instead.
   function handleBuilderDone() {
-    emailEditorRef.current?.editor?.exportHtml((data: Parameters<Parameters<EditorRef['editor']['exportHtml']>[0]>[0]) => {
+    emailEditorRef.current?.editor?.exportHtml((data) => {
       const { design, html } = data;
       setDraft((d) => ({ ...d, bodyPreview: html, designJson: design }));
       setEditorMode('builder');
       setBuilderModalOpen(false);
     });
-
-    // Fix 2 (Recommended): Extract the internal type using the standard Unlayer namespace
-    // emailEditorRef.current?.editor?.exportHtml((data: Unlayer.ExportHtmlData) => {
-    //   const { design, html } = data;
-    //   setDraft((d) => ({ ...d, bodyPreview: html, designJson: design }));
-    //   setEditorMode('builder');
-    //   setBuilderModalOpen(false);
-    // });
-
   }
 
   async function persistDraft(finalDraft: TemplateDraft) {
@@ -178,6 +174,8 @@ export function TemplateEditor() {
   }
 
   async function handleSave() {
+    // Builder content (if any) is already merged into `draft` by
+    // handleBuilderDone(), so saving doesn't need to branch on editorMode.
     await persistDraft({ ...draft, files: pendingFiles });
   }
 
@@ -268,7 +266,7 @@ export function TemplateEditor() {
               multiple
               onChange={(e) => {
                 handleFilesSelected(e.target.files);
-                e.target.value = '';
+                e.target.value = ''; // allow re-selecting the same file later
               }}
             />
             {pendingFiles.length > 0 && (
@@ -393,15 +391,12 @@ export function TemplateEditor() {
               </div>
             </div>
 
-            <div style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative', overflow: 'hidden' }}>
-              {editorHeight != null && (
+            <div style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
+              {editorMinHeight != null && (
                 <EmailEditor
-                //fggfgf
-                  // Remount when height changes so Unlayer re-sizes its iframe.
-                  key={editorHeight}
                   ref={emailEditorRef}
-                  style={{ width: '100%', height: `${editorHeight}px` }}
-                  minHeight={`${editorHeight}px`}
+                  style={{ width: '100%', height: '100%' }}
+                  minHeight={`${editorMinHeight}px`}
                   onReady={onEmailEditorReady}
                   options={{ mergeTags: UNLAYER_MERGE_TAGS, displayMode: 'email' }}
                 />

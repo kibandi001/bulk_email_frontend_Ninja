@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   deleteTemplate,
   duplicateTemplate,
@@ -12,8 +12,20 @@ import { Card } from '../../components/ui/Card';
 
 type SortKey = 'name' | 'updatedAt';
 
+function formatDate(dateStr?: string | null) {
+  if (!dateStr) return '—';
+  try {
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString(LOCALE, { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch {
+    return '—';
+  }
+}
+
 export function TemplateLibrary() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
@@ -25,11 +37,19 @@ export function TemplateLibrary() {
     setLoading(true);
     listTemplates()
       .then(setTemplates)
-      .catch(() => setError('Could not load templates.'))
+      .catch((err) => setError(err instanceof Error ? err.message : 'Could not load templates.'))
       .finally(() => setLoading(false));
   }
 
   useEffect(load, []);
+
+  // Support direct preview link via ?preview=id from Campaign Studio
+  useEffect(() => {
+    const previewParam = searchParams.get('preview');
+    if (previewParam) {
+      setPreviewId(previewParam);
+    }
+  }, [searchParams]);
 
   // Close the preview modal on Escape, same as clicking the overlay/X.
   useEffect(() => {
@@ -42,9 +62,13 @@ export function TemplateLibrary() {
   }, [previewId]);
 
   const visible = useMemo(() => {
-    const filtered = templates.filter((t) => t.name.toLowerCase().includes(query.toLowerCase()));
+    const filtered = templates.filter((t) =>
+      (t.name || '').toLowerCase().includes(query.toLowerCase())
+    );
     return [...filtered].sort((a, b) =>
-      sortKey === 'name' ? a.name.localeCompare(b.name) : b.updatedAt.localeCompare(a.updatedAt)
+      sortKey === 'name'
+        ? (a.name || '').localeCompare(b.name || '')
+        : (b.updatedAt || '').localeCompare(a.updatedAt || '')
     );
   }, [templates, query, sortKey]);
 
@@ -60,11 +84,14 @@ export function TemplateLibrary() {
     }
   }
 
-  async function handleDelete(id: string) {
+  async function handleDelete(t: EmailTemplate) {
+    if (!window.confirm(`Are you sure you want to delete "${t.name}"? This cannot be undone.`)) {
+      return;
+    }
     setError(null);
     try {
-      await deleteTemplate(id);
-      if (previewId === id) setPreviewId(null);
+      await deleteTemplate(t.id);
+      if (previewId === t.id) setPreviewId(null);
       load();
     } catch {
       setError('Could not delete that template.');
@@ -80,29 +107,71 @@ export function TemplateLibrary() {
 
       <Card
         title="Template Library"
-        eyebrow={`${visible.length} of ${templates.length}`}
+        eyebrow={`${visible.length} of ${templates.length} templates`}
         actions={
           <button className="btn btn--primary" onClick={() => navigate('/templates/new')}>
-            Create template
+            + Create template
           </button>
         }
       >
-        <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-          <div className="field" style={{ flex: '1 1 220px', margin: 0 }}>
-            <label htmlFor="tpl-search">Search</label>
-            <input
-              id="tpl-search"
-              placeholder="Search by name…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </div>
-          <div className="field" style={{ margin: 0 }}>
-            <label htmlFor="tpl-sort">Sort by</label>
-            <select id="tpl-sort" value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)}>
-              <option value="updatedAt">Last updated</option>
-              <option value="name">Name</option>
-            </select>
+        <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', gap: 10, flex: '1 1 320px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', flex: '1 1 240px', minWidth: 200 }}>
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', pointerEvents: 'none' }}
+              >
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                id="tpl-search"
+                placeholder="Search templates by name…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                style={{ width: '100%', height: 36, paddingLeft: 32, paddingRight: 28 }}
+              />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => setQuery('')}
+                  title="Clear search"
+                  style={{
+                    position: 'absolute',
+                    right: 8,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--muted)',
+                    cursor: 'pointer',
+                    padding: 4,
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36 }}>
+              <label htmlFor="tpl-sort" style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                Sort:
+              </label>
+              <select
+                id="tpl-sort"
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value as SortKey)}
+                style={{ height: 36, padding: '4px 10px', fontSize: 12.5 }}
+              >
+                <option value="updatedAt">Last updated</option>
+                <option value="name">Name (A–Z)</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -111,43 +180,96 @@ export function TemplateLibrary() {
         {loading ? (
           <p className="section-intro">Loading templates…</p>
         ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Last updated</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((t) => (
-                <tr key={t.id}>
-                  <td>{t.name}</td>
-                  <td className="mono">{new Date(t.updatedAt).toLocaleDateString(LOCALE)}</td>
-                  <td style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <button className="btn" onClick={() => setPreviewId(t.id)}>
-                      Preview
-                    </button>
-                    <button className="btn" onClick={() => navigate(`/templates/${t.id}/edit`)}>
-                      Edit
-                    </button>
-                    <button className="btn" onClick={() => handleDuplicate(t.id)}>
-                      Duplicate
-                    </button>
-                    <button
-                      className="btn btn--primary"
-                      onClick={() => navigate(`/campaigns?templateId=${t.id}`)}
-                    >
-                      Use in campaign
-                    </button>
-                    <button className="btn" onClick={() => handleDelete(t.id)}>
-                      Delete
-                    </button>
-                  </td>
+          <div className="table-responsive">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th style={{ minWidth: 200 }}>Template Name</th>
+                  <th style={{ width: 140 }}>Last updated</th>
+                  <th style={{ textAlign: 'right', minWidth: 280 }}>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {visible.map((t) => (
+                  <tr key={t.id}>
+                    <td>
+                      <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{t.name}</span>
+                    </td>
+                    <td className="mono" style={{ fontSize: 12.5, color: 'var(--muted)' }}>
+                      {formatDate(t.updatedAt)}
+                    </td>
+                    <td>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'flex-end',
+                          gap: 6,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        <button
+                          className="btn btn--primary"
+                          onClick={() => navigate(`/campaigns?templateId=${t.id}`)}
+                          style={{ padding: '4px 10px', fontSize: 12 }}
+                          title="Create a campaign with this template"
+                        >
+                          Use in campaign
+                        </button>
+                        <button
+                          className="btn"
+                          onClick={() => setPreviewId(t.id)}
+                          style={{ padding: '4px 9px', fontSize: 12 }}
+                          title="Preview template"
+                        >
+                          Preview
+                        </button>
+                        <button
+                          className="btn"
+                          onClick={() => navigate(`/templates/${t.id}/edit`)}
+                          style={{ padding: '4px 9px', fontSize: 12 }}
+                          title="Edit template"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="btn"
+                          onClick={() => handleDuplicate(t.id)}
+                          style={{ padding: '4px 9px', fontSize: 12 }}
+                          title="Duplicate template"
+                        >
+                          Duplicate
+                        </button>
+                        <button
+                          className="btn"
+                          onClick={() => handleDelete(t)}
+                          style={{ padding: '4px 9px', fontSize: 12 }}
+                          title="Delete template"
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.color = 'var(--alert)';
+                            e.currentTarget.style.borderColor = 'var(--alert)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.color = '';
+                            e.currentTarget.style.borderColor = '';
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {visible.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="empty-state">
+                      {query ? `No templates found matching "${query}".` : 'No templates added yet.'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
 
