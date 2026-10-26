@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from 'react';
 import {
   listPaginatedSubscribers,
@@ -100,8 +99,6 @@ export function Contacts() {
         setSubscribers(items);
         setTotalCount(res?.count ?? items.length);
         if (opts.silent) {
-          // Don't blow away the user's selection on a background refresh —
-          // just drop any ids that no longer exist in the refreshed list.
           const stillPresent = new Set(items.map((i: Subscriber) => i.id));
           setSelectedIds((prev) => prev.filter((id) => stillPresent.has(id)));
         } else {
@@ -120,16 +117,6 @@ export function Contacts() {
     }
   }, [offset, selectedGroupId, statusFilter, activeTab]);
 
-  // Live-updating list. There's no CONFIRMED WebSocket/push endpoint for
-  // subscribers (see the ASSUMPTION note on SUBSCRIBERS_WS_URL) so this uses
-  // both a socket and a polling fallback rather than betting on one:
-  //  - useSubscriberEvents tries the socket and silently refetches on any
-  //    recognised change event.
-  //  - The interval below keeps polling as a safety net, but backs off to a
-  //    slow 60s "just in case" cadence once the socket reports connected,
-  //    and runs every 15s while the socket isn't (yet) available.
-  // Both are paused while a modal is open (can't clobber an in-progress
-  // add/edit) and off the Contacts tab.
   const socketEnabled = activeTab === 'contacts' && !showAddModal && !editingSubscriber;
   const { connected: socketConnected } = useSubscriberEvents({
     enabled: socketEnabled,
@@ -263,9 +250,6 @@ export function Contacts() {
     }
   }
 
-  // Exports every contact matching the current search/group/status filters,
-  // not just the current page — there's no backend export endpoint, so this
-  // pages through listPaginatedSubscribers client-side and builds the CSV.
   async function handleExportCsv() {
     setExporting(true);
     try {
@@ -404,9 +388,8 @@ export function Contacts() {
     return '—';
   }
 
-
   return (
-    <div>
+    <div className="contacts-container">
       <p className="section-intro">
         Manage your contact base, subscriber lists, and automated group memberships.
       </p>
@@ -482,140 +465,150 @@ export function Contacts() {
             </div>
           )}
 
-          {/* Filters Bar */}
-          <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-            <form onSubmit={handleSearchSubmit} style={{ flex: 1, minWidth: 220 }}>
-              <input
-                placeholder="Search by email (press Enter)"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </form>
+          {/* Filters Bar using the new CSS classes */}
+          <div className="contacts__toolbar">
+            <div className="contacts__search-row">
+              <form onSubmit={handleSearchSubmit} style={{ flex: 1 }}>
+                <input
+                  className="contacts__search-input"
+                  placeholder="Search by email (press Enter)"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </form>
+            </div>
+            
+            <div className="contacts__filter-row">
+              <select
+                className="contacts__filter-select"
+                value={selectedGroupId}
+                onChange={(e) => {
+                  setSelectedGroupId(e.target.value);
+                  setOffset(0);
+                }}
+              >
+                <option value="">All Groups</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name} ({g.num_subscribers ?? 0})
+                  </option>
+                ))}
+              </select>
 
-            <select
-              value={selectedGroupId}
-              onChange={(e) => {
-                setSelectedGroupId(e.target.value);
-                setOffset(0);
-              }}
-              style={{ minWidth: 180 }}
-            >
-              <option value="">All Groups</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name} ({g.num_subscribers ?? 0})
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value as any);
-                setOffset(0);
-              }}
-              style={{ minWidth: 150 }}
-            >
-              <option value="all">All Statuses</option>
-              <option value="subscribed">Subscribed</option>
-              <option value="unsubscribed">Unsubscribed</option>
-              <option value="blacklisted">Blacklisted</option>
-            </select>
+              <select
+                className="contacts__filter-select"
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value as any);
+                  setOffset(0);
+                }}
+              >
+                <option value="all">All Statuses</option>
+                <option value="subscribed">Subscribed</option>
+                <option value="unsubscribed">Unsubscribed</option>
+                <option value="blacklisted">Blacklisted</option>
+              </select>
+            </div>
           </div>
 
           {/* Contacts Table */}
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th style={{ width: 36 }}>
-                  <input
-                    type="checkbox"
-                    checked={subscribers.length > 0 && selectedIds.length === subscribers.length}
-                    onChange={toggleSelectAll}
-                  />
-                </th>
-                <th>Name</th>
-                <th>Email</th>
-                <th>List / Group</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table" style={{ width: '100%', tableLayout: 'auto' }}>
+              <thead>
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: 24 }}>
-                    Loading contacts...
-                  </td>
+                  <th style={{ width: 36 }}>
+                    <input
+                      type="checkbox"
+                      checked={subscribers.length > 0 && selectedIds.length === subscribers.length}
+                      onChange={toggleSelectAll}
+                    />
+                  </th>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>List / Group</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
-              ) : subscribers.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="empty-state">
-                    No contacts match the criteria.
-                  </td>
-                </tr>
-              ) : (
-                subscribers.map((c) => {
-                  const name =
-                    [c.first_name, c.last_name]
-                      .filter((n) => n && n !== 'nan')
-                      .join(' ') || '—';
-                  const status = c.is_blacklisted
-                    ? 'bounced'
-                    : c.is_subscribed
-                      ? 'subscribed'
-                      : 'unsubscribed';
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: 24 }}>
+                      Loading contacts...
+                    </td>
+                  </tr>
+                ) : subscribers.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="empty-state">
+                      No contacts match the criteria.
+                    </td>
+                  </tr>
+                ) : (
+                  subscribers.map((c, i) => {
+                    const name =
+                      [c.first_name, c.last_name]
+                        .filter((n) => n && n !== 'nan')
+                        .join(' ') || '—';
+                    const status = c.is_blacklisted
+                      ? 'bounced'
+                      : c.is_subscribed
+                        ? 'subscribed'
+                        : 'unsubscribed';
 
-                  return (
-                    <tr key={`${c.id}-${c.group_id ?? 0}`}>
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(c.id)}
-                          onChange={() => toggleSelectRow(c.id)}
-                        />
-                      </td>
-                      <td>{name}</td>
-                      <td className="mono">{c.email}</td>
-                      <td>{resolveGroupName(c)}</td>
-                      <td>
-                        <StatusBadge status={status} />
-                      </td>
-                      <td className="mono">{c.created_at || '—'}</td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button
-                            className="btn btn--sm"
-                            onClick={() => openEditContact(c)}
-                            style={{ padding: '2px 8px', fontSize: 12 }}
-                          >
-                            Edit
-                          </button>
-                          {c.is_subscribed && (
+                    return (
+                      <tr 
+                        key={`${c.id}-${c.group_id ?? 0}`}
+                        style={{ backgroundColor: i % 2 === 0 ? 'var(--row-alt, #f7f9fc)' : 'transparent' }}
+                      >
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(c.id)}
+                            onChange={() => toggleSelectRow(c.id)}
+                          />
+                        </td>
+                        <td style={{ wordBreak: 'break-word' }}>{name}</td>
+                        <td className="mono" style={{ wordBreak: 'break-all' }}>{c.email}</td>
+                        <td style={{ wordBreak: 'break-word' }}>{resolveGroupName(c)}</td>
+                        <td>
+                          <StatusBadge status={status} />
+                        </td>
+                        <td className="mono" style={{ whiteSpace: 'nowrap' }}>{c.created_at || '—'}</td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                             <button
                               className="btn btn--sm"
-                              onClick={() => handleUnsubscribeContact(c.id)}
+                              onClick={() => openEditContact(c)}
                               style={{ padding: '2px 8px', fontSize: 12 }}
                             >
-                              Unsubscribe
+                              Edit
                             </button>
-                          )}
-                          <button
-                            className="btn btn--sm btn--danger"
-                            onClick={() => handleDeleteContact(c.id)}
-                            style={{ padding: '2px 8px', fontSize: 12 }}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                            {c.is_subscribed && (
+                              <button
+                                className="btn btn--sm"
+                                onClick={() => handleUnsubscribeContact(c.id)}
+                                style={{ padding: '2px 8px', fontSize: 12 }}
+                              >
+                                Unsubscribe
+                              </button>
+                            )}
+                            <button
+                              className="btn btn--sm btn--danger"
+                              onClick={() => handleDeleteContact(c.id)}
+                              style={{ padding: '2px 8px', fontSize: 12 }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
 
           {/* Pagination */}
           <div
@@ -665,61 +658,63 @@ export function Contacts() {
             </button>
           }
         >
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Group Name</th>
-                <th>Description</th>
-                <th>Subscribers</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {groupsLoading ? (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table" style={{ width: '100%', tableLayout: 'auto' }}>
+              <thead>
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: 24 }}>
-                    Loading groups...
-                  </td>
+                  <th>ID</th>
+                  <th>Group Name</th>
+                  <th>Description</th>
+                  <th>Subscribers</th>
+                  <th>Created</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
-              ) : groups.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="empty-state">
-                    No subscriber groups created yet.
-                  </td>
-                </tr>
-              ) : (
-                groups.map((g) => (
-                  <tr key={g.id}>
-                    <td className="mono">{g.id}</td>
-                    <td style={{ fontWeight: 600 }}>{g.name}</td>
-                    <td>{g.description || '—'}</td>
-                    <td className="mono">{g.num_subscribers?.toLocaleString() ?? 0}</td>
-                    <td className="mono">{g.created_at || '—'}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button
-                          className="btn btn--sm"
-                          onClick={() => openEditGroup(g)}
-                          style={{ padding: '2px 8px', fontSize: 12 }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="btn btn--sm btn--danger"
-                          onClick={() => handleDeleteGroup(g.id)}
-                          style={{ padding: '2px 8px', fontSize: 12 }}
-                        >
-                          Delete
-                        </button>
-                      </div>
+              </thead>
+              <tbody>
+                {groupsLoading ? (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: 24 }}>
+                      Loading groups...
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : groups.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="empty-state">
+                      No subscriber groups created yet.
+                    </td>
+                  </tr>
+                ) : (
+                  groups.map((g) => (
+                    <tr key={g.id}>
+                      <td className="mono">{g.id}</td>
+                      <td style={{ fontWeight: 600 }}>{g.name}</td>
+                      <td>{g.description || '—'}</td>
+                      <td className="mono">{g.num_subscribers?.toLocaleString() ?? 0}</td>
+                      <td className="mono">{g.created_at || '—'}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                          <button
+                            className="btn btn--sm"
+                            onClick={() => openEditGroup(g)}
+                            style={{ padding: '2px 8px', fontSize: 12 }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="btn btn--sm btn--danger"
+                            onClick={() => handleDeleteGroup(g.id)}
+                            style={{ padding: '2px 8px', fontSize: 12 }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </Card>
       )}
 
@@ -727,19 +722,21 @@ export function Contacts() {
       {/* MODAL: ADD / EDIT CONTACT */}
       {/* ==================================================== */}
       {(showAddModal || editingSubscriber) && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-          }}
-        >
-          <div style={{ background: 'var(--card-bg, #fff)', padding: 24, borderRadius: 8, width: 440 }}>
-            <h3 style={{ marginTop: 0 }}>{editingSubscriber ? 'Edit Contact' : 'Add Contact'}</h3>
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3 className="modal-title">{editingSubscriber ? 'Edit Contact' : 'Add Contact'}</h3>
+              <button 
+                className="modal-close" 
+                onClick={() => {
+                  setShowAddModal(false);
+                  setEditingSubscriber(null);
+                }}
+              >
+                ×
+              </button>
+            </div>
+            
             <form onSubmit={handleSaveContact}>
               <div className="field" style={{ marginBottom: 12 }}>
                 <label>Email *</label>
@@ -808,7 +805,7 @@ export function Contacts() {
 
               {contactError && <p style={{ color: 'red', fontSize: 13 }}>{contactError}</p>}
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <div className="modal-actions">
                 <button
                   type="button"
                   className="btn"
@@ -832,19 +829,15 @@ export function Contacts() {
       {/* MODAL: ADD / EDIT GROUP */}
       {/* ==================================================== */}
       {showGroupModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-          }}
-        >
-          <div style={{ background: 'var(--card-bg, #fff)', padding: 24, borderRadius: 8, width: 440 }}>
-            <h3 style={{ marginTop: 0 }}>{editingGroup ? 'Edit Group' : 'Create Subscriber Group'}</h3>
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3 className="modal-title">{editingGroup ? 'Edit Group' : 'Create Subscriber Group'}</h3>
+              <button className="modal-close" onClick={() => setShowGroupModal(false)}>
+                ×
+              </button>
+            </div>
+            
             <form onSubmit={handleSaveGroup}>
               <div className="field" style={{ marginBottom: 12 }}>
                 <label>Group Name *</label>
@@ -868,7 +861,7 @@ export function Contacts() {
 
               {groupError && <p style={{ color: 'red', fontSize: 13 }}>{groupError}</p>}
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <div className="modal-actions">
                 <button type="button" className="btn" onClick={() => setShowGroupModal(false)}>
                   Cancel
                 </button>

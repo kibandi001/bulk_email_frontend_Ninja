@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import EmailEditor from 'react-email-editor';
 import type { EditorRef, EmailEditorProps } from 'react-email-editor';
@@ -6,25 +6,25 @@ import { z } from 'zod';
 import {
   createTemplate,
   getTemplate,
-  PREVIEW_TARGETS,
   updateTemplate,
   validateTemplate,
 } from '../../services/templateService';
 import type { TemplateDraft, TemplateValidationIssue } from '../../types';
 import { Card } from '../../components/ui/Card';
 
+// Rough shape check for Unlayer's design JSON before handing it back to
+// loadDesign() — designJson is persisted/round-tripped data, so this guards
+// against a stale or corrupted record crashing the editor at load time.
 const JSONTemplateEmailSchema = z.object({
   counters: z.record(z.string(), z.number()),
   body: z.record(z.string(), z.any()),
 });
 
-const COMMON_MERGE_FIELDS = ['{{first_name}}', '{{last_name}}', '{{company_name}}', '{{licence_number}}'];
+const COMMON_MERGE_FIELDS = ['{{first_name}}', '{{last_name}}'];
 
 const UNLAYER_MERGE_TAGS = {
   first_name: { name: 'First Name', value: '{{first_name}}' },
   last_name: { name: 'Last Name', value: '{{last_name}}' },
-  company_name: { name: 'Company Name', value: '{{company_name}}' },
-  licence_number: { name: 'Licence Number', value: '{{licence_number}}' },
 };
 
 type EditorMode = 'simple' | 'builder';
@@ -36,14 +36,26 @@ const emptyDraft: TemplateDraft = {
   mergeFields: [],
 };
 
+// react-email-editor renders an inner <div> with a fixed pixel height
+// wrapped around the Unlayer iframe. Without this, setting height:100% on
+// the component's outer wrapper leaves the actual canvas stuck at its
+// default height and produces the "empty space" at the bottom of the modal.
+const EMAIL_EDITOR_FILL_CSS = `
+  .email-editor-fill,
+  .email-editor-fill > div,
+  .email-editor-fill iframe {
+    height: 100% !important;
+    min-height: 100% !important;
+    width: 100% !important;
+  }
+`;
+
 export function TemplateEditor() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isEditing = Boolean(id);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const emailEditorRef = useRef<EditorRef>(null);
-  const builderHeaderRef = useRef<HTMLDivElement>(null);
-  const [editorHeight, setEditorHeight] = useState<number | null>(null);
 
   const [draft, setDraft] = useState<TemplateDraft>(emptyDraft);
   const [editorMode, setEditorMode] = useState<EditorMode>('simple');
@@ -62,11 +74,23 @@ export function TemplateEditor() {
           subjectPreview: t.subjectPreview,
           bodyPreview: t.bodyPreview,
           mergeFields: t.mergeFields,
+          designJson: t.designJson,
         });
+        
+        // If the loaded template has a design JSON or HTML (from the builder), 
+        // switch the mode to 'builder' AND open the modal immediately.
+        if (t.designJson || (t.bodyPreview && t.bodyPreview.includes('<'))) {
+          setEditorMode('builder');
+          setBuilderModalOpen(true);
+        } else {
+          setEditorMode('simple');
+        }
       })
       .catch(() => setLoadError('Could not load that template.'));
   }, [id]);
 
+  // Close the builder modal on Escape (without saving its contents — same
+  // as clicking the overlay). Use "Done" inside the modal to keep changes.
   useEffect(() => {
     if (!builderModalOpen) return;
     function onKeyDown(e: KeyboardEvent) {
@@ -76,38 +100,16 @@ export function TemplateEditor() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [builderModalOpen]);
 
-  // react-email-editor sizes its internal Unlayer iframe once, on mount,
-  // using `minHeight` / `style.height`. There is no public layout()/resize()
-  // method in its type definitions, so the only reliable way to give the
-  // editor the right size is to compute a concrete pixel height before it
-  // mounts and pass it in.
-  //
-  // We measure the modal header after layout (rAF, because the ref isn't
-  // attached on the first render tick) and derive the body height from the
-  // modal's fixed 90vh.
-  useLayoutEffect(() => {
-    if (!builderModalOpen) {
-      setEditorHeight(null);
-      return;
-    }
-    const raf = requestAnimationFrame(() => {
-      const headerHeight = builderHeaderRef.current?.getBoundingClientRect().height ?? 57;
-      const modalHeight = window.innerHeight * 0.9;
-      setEditorHeight(Math.max(500, Math.round(modalHeight - headerHeight)));
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [builderModalOpen]);
-
-  const onEmailEditorReady: EmailEditorProps['onReady'] = () => {
-    if (!draft.designJson) return;
-    const parsed = JSONTemplateEmailSchema.safeParse(draft.designJson);
-    if (parsed.success) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      emailEditorRef.current?.editor?.loadDesign(parsed.data as any);
-    } else {
-      console.error('Design JSON validation failed', parsed.error);
-    }
-  };
+  // Inject the CSS that makes the Unlayer iframe fill its container.
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.setAttribute('data-email-editor-fill', 'true');
+    style.textContent = EMAIL_EDITOR_FILL_CSS;
+    document.head.appendChild(style);
+    return () => {
+      style.remove();
+    };
+  }, []);
 
   function insertMergeField(field: string) {
     const textarea = bodyRef.current;
@@ -135,26 +137,19 @@ export function TemplateEditor() {
     setPendingFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
-  function handleValidate() {
-    setIssues(validateTemplate(draft));
+  function previewFile(file: File) {
+    const url = URL.createObjectURL(file);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   function handleBuilderDone() {
-    emailEditorRef.current?.editor?.exportHtml((data: Parameters<Parameters<EditorRef['editor']['exportHtml']>[0]>[0]) => {
+    emailEditorRef.current?.editor?.exportHtml((data) => {
       const { design, html } = data;
       setDraft((d) => ({ ...d, bodyPreview: html, designJson: design }));
       setEditorMode('builder');
       setBuilderModalOpen(false);
     });
-
-    // Fix 2 (Recommended): Extract the internal type using the standard Unlayer namespace
-    // emailEditorRef.current?.editor?.exportHtml((data: Unlayer.ExportHtmlData) => {
-    //   const { design, html } = data;
-    //   setDraft((d) => ({ ...d, bodyPreview: html, designJson: design }));
-    //   setEditorMode('builder');
-    //   setBuilderModalOpen(false);
-    // });
-
   }
 
   async function persistDraft(finalDraft: TemplateDraft) {
@@ -219,13 +214,23 @@ export function TemplateEditor() {
             >
               Simple editor
             </button>
-            <button type="button" className="btn" onClick={() => setBuilderModalOpen(true)}>
+            <button 
+              type="button" 
+              className={editorMode === 'builder' ? 'btn btn--primary' : 'btn'} 
+              onClick={() => setBuilderModalOpen(true)}
+            >
               {editorMode === 'builder' ? 'Edit in drag-and-drop builder' : 'Open drag-and-drop builder'}
             </button>
           </div>
 
           {editorMode === 'simple' && (
             <>
+              {draft.bodyPreview.includes('<') && (
+                <p className="login__error" style={{ marginBottom: 12 }}>
+                  <strong>Warning:</strong> You are editing HTML from the drag-and-drop builder as plain text.
+                  Saving changes here will overwrite the visual layout.
+                </p>
+              )}
               <div className="field">
                 <label htmlFor="tpl-body">Body</label>
                 <textarea
@@ -268,18 +273,26 @@ export function TemplateEditor() {
               multiple
               onChange={(e) => {
                 handleFilesSelected(e.target.files);
-                e.target.value = '';
+                e.target.value = ''; 
               }}
             />
             {pendingFiles.length > 0 && (
               <ul style={{ marginTop: 8, paddingLeft: 18 }}>
                 {pendingFiles.map((file, i) => (
-                  <li key={`${file.name}-${i}`} style={{ fontSize: 13 }}>
+                  <li key={`${file.name}-${i}`} style={{ fontSize: 13, marginBottom: 4 }}>
                     {file.name}{' '}
                     <button
                       type="button"
                       className="btn"
-                      style={{ padding: '0 6px', fontSize: 12 }}
+                      style={{ padding: '0 6px', fontSize: 12, marginLeft: 6 }}
+                      onClick={() => previewFile(file)}
+                    >
+                      Preview
+                    </button>
+                    <button
+                      type="button"
+                      className="btn"
+                      style={{ padding: '0 6px', fontSize: 12, marginLeft: 4 }}
                       onClick={() => removePendingFile(i)}
                     >
                       Remove
@@ -301,9 +314,6 @@ export function TemplateEditor() {
           )}
 
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-            <button className="btn" type="button" onClick={handleValidate}>
-              Validate
-            </button>
             <button className="btn btn--primary" type="button" onClick={handleSave} disabled={saving}>
               Save template
             </button>
@@ -313,31 +323,21 @@ export function TemplateEditor() {
           </div>
         </Card>
 
-        <Card title="Responsive / device & client preview">
+        <Card title="Preview">
           <p style={{ marginBottom: 4 }}>
             <strong>Subject:</strong> {draft.subjectPreview || '(no subject yet)'}
           </p>
-          <p className="section-intro" style={{ marginTop: 0, whiteSpace: 'pre-wrap' }}>
-            {draft.bodyPreview || '(template body will appear here)'}
-          </p>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 12 }}>
-            {PREVIEW_TARGETS.map((target) => (
-              <div
-                key={target.label}
-                style={{
-                  width: Math.min(target.widthPx, 220),
-                  border: '1px solid var(--rule, #ccc)',
-                  borderRadius: 4,
-                  padding: 10,
-                }}
-              >
-                <p className="card__eyebrow" style={{ marginBottom: 6 }}>
-                  {target.label}
-                </p>
-                <p style={{ fontSize: 12, margin: 0 }}>{draft.subjectPreview || '(no subject yet)'}</p>
-              </div>
-            ))}
-          </div>
+
+          {editorMode === 'builder' ? (
+            <div
+              style={{ marginTop: 12, border: '1px solid var(--rule, #eee)', padding: 16, borderRadius: 4 }}
+              dangerouslySetInnerHTML={{ __html: draft.bodyPreview }}
+            />
+          ) : (
+            <p className="section-intro" style={{ marginTop: 0, whiteSpace: 'pre-wrap' }}>
+              {draft.bodyPreview}
+            </p>
+          )}
         </Card>
       </div>
 
@@ -372,7 +372,6 @@ export function TemplateEditor() {
             }}
           >
             <div
-              ref={builderHeaderRef}
               style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -393,19 +392,32 @@ export function TemplateEditor() {
               </div>
             </div>
 
-            <div style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative', overflow: 'hidden' }}>
-              {editorHeight != null && (
-                <EmailEditor
-                //fggfgf
-                  // Remount when height changes so Unlayer re-sizes its iframe.
-                  key={editorHeight}
-                  ref={emailEditorRef}
-                  style={{ width: '100%', height: `${editorHeight}px` }}
-                  minHeight={`${editorHeight}px`}
-                  onReady={onEmailEditorReady}
-                  options={{ mergeTags: UNLAYER_MERGE_TAGS, displayMode: 'email' }}
-                />
-              )}
+            <div
+              className="email-editor-fill"
+              style={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex' }}
+            >
+              <EmailEditor
+                ref={emailEditorRef}
+                style={{ width: '100%', height: '100%', flex: 1, minHeight: 0 }}
+                minHeight={600}
+                options={{ 
+                  mergeTags: UNLAYER_MERGE_TAGS, 
+                  displayMode: 'email',
+                  // This is the magic fix: we tell Unlayer to run this callback
+                  // exactly when it has finished booting up.
+                  onLoad: () => {
+                    if (draft.designJson) {
+                      const parsed = JSONTemplateEmailSchema.safeParse(draft.designJson);
+                      if (parsed.success) {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        emailEditorRef.current?.editor?.loadDesign(parsed.data as any);
+                      } else {
+                        console.error('Design JSON validation failed', parsed.error);
+                      }
+                    }
+                  }
+                }}
+              />
             </div>
           </div>
         </div>

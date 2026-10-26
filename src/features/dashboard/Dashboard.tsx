@@ -6,6 +6,14 @@ import { getCampaignStatsSummary } from '../../services/campaignStatsService';
 import type { CampaignStatsSummary } from '../../types/campaignStats';
 import { DateRangeFilter } from '../../components/ui/DateRangeFilter';
 
+// Importing the Tabler Icons based on your new mapping
+import { 
+  IconMessageShare, 
+  IconMailbox, 
+  IconMouse2, 
+  IconAlertTriangle 
+} from '@tabler/icons-react';
+
 // Reused from the original dashboard tiles so the new layout still reads as
 // the same product: blue = sent/volume, purple = open engagement,
 // green = click engagement, amber = deliverability issues.
@@ -21,7 +29,7 @@ function currentMonthRange(): { startDate: string; endDate: string } {
   const fmt = (d: Date) => d.toISOString().slice(0, 10);
   return { startDate: fmt(start), endDate: fmt(end) };
 }
-//noma sana. nishow bana
+
 function timeOfDayGreeting(): string {
   const hour = new Date().getHours();
   if (hour < 12) return 'Good morning';
@@ -35,7 +43,7 @@ function StatCard({
   label,
   value,
 }: {
-  icon: string;
+  icon: React.ReactNode;
   accent: string;
   label: string;
   value: string;
@@ -63,7 +71,6 @@ function StatCard({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: 16,
           marginBottom: 10,
         }}
       >
@@ -160,8 +167,6 @@ export function Dashboard() {
   ];
   const volumeMax = Math.max(1, ...volumeMetrics.map((m) => m.value));
 
-  // Delivery breakdown donut — built entirely from real fields already
-  // returned by campaignStatsService (delivered / bounced / unsubscribed).
   const delivered = stats?.totalDelivered ?? 0;
   const bounced = stats?.totalBounces ?? 0;
   const unsubscribed = stats?.totalUnsubscribers ?? 0;
@@ -221,21 +226,26 @@ export function Dashboard() {
           marginBottom: 20,
         }}
       >
-        <StatCard icon="📧" accent={BLUE} label="Messages sent" value={totalSent.toLocaleString()} />
+        <StatCard 
+          icon={<IconMessageShare size={20} stroke={2} />} 
+          accent={BLUE} 
+          label="Messages sent" 
+          value={totalSent.toLocaleString()} 
+        />
         <StatCard
-          icon="📬"
+          icon={<IconMailbox size={20} stroke={2} />}
           accent={PURPLE}
           label="Average open rate"
           value={openRate != null ? `${openRate.toFixed(1)}%` : '—'}
         />
         <StatCard
-          icon="🖱️"
+          icon={<IconMouse2 size={20} stroke={2} />}
           accent={GREEN}
           label="Click rate"
           value={clickRate != null ? `${clickRate.toFixed(1)}%` : '—'}
         />
         <StatCard
-          icon="⚠️"
+          icon={<IconAlertTriangle size={20} stroke={2} />}
           accent={AMBER}
           label="Bounces"
           value={totalBounces != null ? totalBounces.toLocaleString() : '—'}

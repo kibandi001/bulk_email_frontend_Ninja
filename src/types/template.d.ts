@@ -13,6 +13,10 @@ export interface EmailTemplate {
   bodyPreview: string;
   /** Merge fields present in the body, e.g. '{{first_name}}'. */
   mergeFields: string[];
+  /** Unlayer's design schema, present only when the template was built (or
+   * last edited) with the drag-and-drop builder rather than the plain
+   * textarea. */
+  designJson?: Record<string, unknown>;
 }
 
 export interface TemplateDraft {
