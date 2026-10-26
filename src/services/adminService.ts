@@ -69,26 +69,43 @@ export async function getQuota(): Promise<QuotaMetric[]> {
 interface RawManagedUser {
   id: number;
   email: string;
-  username: string;
-  is_admin: boolean;
-  company_id: number | null;
-  phone: string | null;
+  username?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  full_name?: string | null;
+  name?: string | null;
+  is_admin?: boolean;
+  isAdmin?: boolean;
+  company_id?: number | null;
+  companyId?: number | null;
+  phone?: string | null;
+  phone_number?: string | null;
 }
 
 interface RawUserPage {
-  count: number;
-  results: RawManagedUser[];
+  count?: number;
+  total?: number;
+  total_count?: number;
+  results?: RawManagedUser[];
+  data?: RawManagedUser[] | { results?: RawManagedUser[]; count?: number; total?: number };
 }
 
 function mapManagedUser(raw: RawManagedUser): ManagedUser {
+  const rawFirst = raw.first_name?.trim() || '';
+  const rawLast = raw.last_name?.trim() || '';
+  const joinedName = [rawFirst, rawLast].filter(Boolean).join(' ').trim();
+  const explicitFullName = raw.full_name?.trim() || raw.name?.trim() || joinedName || null;
+  const isAdmin = Boolean(raw.is_admin ?? raw.isAdmin);
+
   return {
     id: raw.id,
-    email: raw.email,
-    username: raw.username,
-    isAdmin: raw.is_admin,
-    companyId: raw.company_id,
-    phone: raw.phone,
-    role: roleFromIsAdmin(raw.is_admin),
+    email: raw.email || '',
+    username: raw.username || '',
+    fullName: explicitFullName,
+    isAdmin,
+    companyId: raw.company_id ?? raw.companyId ?? null,
+    phone: raw.phone || raw.phone_number || null,
+    role: roleFromIsAdmin(isAdmin),
   };
 }
 
@@ -99,8 +116,37 @@ export interface ListUsersResult {
 
 /** GET /all-users/list/?limit=&offset= */
 export async function listUsers(limit = 20, offset = 0): Promise<ListUsersResult> {
-  const page = await apiClient.get<RawUserPage>(`/all-users/list/?limit=${limit}&offset=${offset}`);
-  return { users: page.results.map(mapManagedUser), total: page.count };
+  const page = await apiClient.get<RawUserPage | RawManagedUser[]>(`/all-users/list/?limit=${limit}&offset=${offset}`);
+
+  let rawList: RawManagedUser[] = [];
+  let totalCount: number | undefined;
+
+  if (Array.isArray(page)) {
+    rawList = page;
+    totalCount = page.length;
+  } else if (page && typeof page === 'object') {
+    if (Array.isArray(page.results)) {
+      rawList = page.results;
+    } else if (Array.isArray(page.data)) {
+      rawList = page.data;
+    } else if (page.data && Array.isArray((page.data as any).results)) {
+      rawList = (page.data as any).results;
+    }
+
+    totalCount =
+      page.count ??
+      page.total ??
+      page.total_count ??
+      (page.data && typeof (page.data as any).count === 'number' ? (page.data as any).count : undefined) ??
+      (page.data && typeof (page.data as any).total === 'number' ? (page.data as any).total : undefined);
+  }
+
+  const finalTotal = typeof totalCount === 'number' && !isNaN(totalCount) ? totalCount : rawList.length;
+
+  return {
+    users: rawList.map(mapManagedUser),
+    total: finalTotal,
+  };
 }
 
 /** GET /users/list/?id= */

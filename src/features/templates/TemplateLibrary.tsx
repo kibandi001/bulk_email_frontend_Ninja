@@ -30,7 +30,6 @@ function fillMergeFields(body: string): string {
   const sampleData: Record<string, string> = {
     first_name: 'Jane',
     last_name: 'Doe',
-    company_name: 'Acme Ltd',
     email: 'jane.doe@example.com',
   };
 

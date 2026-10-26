@@ -137,12 +137,14 @@ export function TemplateEditor() {
     setPendingFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
+  // Generates a temporary local URL to preview the file in a new tab.
   function previewFile(file: File) {
     const url = URL.createObjectURL(file);
     window.open(url, '_blank');
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  // Pulls the current design out of Unlayer and commits it into `draft`.
   function handleBuilderDone() {
     emailEditorRef.current?.editor?.exportHtml((data) => {
       const { design, html } = data;
@@ -403,8 +405,6 @@ export function TemplateEditor() {
                 options={{ 
                   mergeTags: UNLAYER_MERGE_TAGS, 
                   displayMode: 'email',
-                  // This is the magic fix: we tell Unlayer to run this callback
-                  // exactly when it has finished booting up.
                   onLoad: () => {
                     if (draft.designJson) {
                       const parsed = JSONTemplateEmailSchema.safeParse(draft.designJson);

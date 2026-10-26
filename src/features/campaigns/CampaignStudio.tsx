@@ -708,30 +708,7 @@ export function CampaignStudio() {
               })`}
           >
             <div className="campaign-studio__controls">
-              {/* Search */}
-              <div className="campaign-studio__search-bar">
-                <input
-                  className="campaign-studio__search-input"
-                  placeholder="Search campaigns by name or subject…"
-                  value={searchQuery}
-                  onChange={(e) =>
-                    setSearchQuery(e.target.value)
-                  }
-                />
-
-                {hasActiveFilters && (
-                  <button
-                    type="button"
-                    className="campaign-studio__clear-btn"
-                    onClick={clearFilters}
-                    title="Clear all filters"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-
-              {/* Status Filters */}
+              {/* Status Filter Tabs */}
               <div className="campaign-studio__pills">
                 {(
                   [
@@ -746,14 +723,12 @@ export function CampaignStudio() {
                   <button
                     key={st}
                     type="button"
-                    className={`campaign-studio__pill ${selectedStatus === st
-                        ? 'campaign-studio__pill--active'
-                        : ''
-                      }`}
+                    className={`campaign-studio__pill ${
+                      selectedStatus === st ? 'campaign-studio__pill--active' : ''
+                    }`}
                     onClick={() => setSelectedStatus(st)}
                   >
-                    <span>{st}</span>
-
+                    <span>{st === 'all' ? 'All campaigns' : st}</span>
                     <span className="campaign-studio__pill-badge">
                       {statusCounts[st] || 0}
                     </span>
@@ -761,77 +736,120 @@ export function CampaignStudio() {
                 ))}
               </div>
 
-              {/* Date and sort filters */}
-              <div className="campaign-studio__filter-row campaign-studio__filter-row--date">
-                <div className="campaign-studio__filter-control">
-                  <label
-                    className="campaign-studio__filter-label"
-                    htmlFor="campaign-date-from"
-                  >
-                    From:
-                  </label>
-                  <input
-                    id="campaign-date-from"
-                    type="date"
-                    className="campaign-studio__filter-select"
-                    value={dateFrom}
-                    onChange={(e) => setDateFrom(e.target.value)}
-                  />
+              {/* Consolidated Filter & Search Bar */}
+              <div className="campaign-studio__toolbar">
+                <div className="campaign-studio__toolbar-left">
+                  {/* Search */}
+                  <div className="campaign-studio__search-wrapper">
+                    <svg
+                      className="campaign-studio__search-icon"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <circle cx="11" cy="11" r="8" />
+                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                    <input
+                      className="campaign-studio__search-input"
+                      placeholder="Search name or subject…"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        className="campaign-studio__search-clear"
+                        onClick={() => setSearchQuery('')}
+                        title="Clear search text"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Compact Date Range Picker */}
+                  <div className="campaign-studio__date-group">
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      style={{ color: 'var(--muted)', flexShrink: 0 }}
+                    >
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                      <line x1="16" y1="2" x2="16" y2="6" />
+                      <line x1="8" y1="2" x2="8" y2="6" />
+                      <line x1="3" y1="10" x2="21" y2="10" />
+                    </svg>
+                    <label
+                      htmlFor="campaign-date-from"
+                      className="campaign-studio__date-label"
+                    >
+                      From:
+                    </label>
+                    <input
+                      id="campaign-date-from"
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                      title="From date"
+                      aria-label="Filter from date"
+                    />
+                    <span className="campaign-studio__date-sep">|</span>
+                    <label
+                      htmlFor="campaign-date-to"
+                      className="campaign-studio__date-label"
+                    >
+                      To:
+                    </label>
+                    <input
+                      id="campaign-date-to"
+                      type="date"
+                      value={dateTo}
+                      min={dateFrom || undefined}
+                      onChange={(e) => setDateTo(e.target.value)}
+                      title="To date"
+                      aria-label="Filter to date"
+                    />
+                  </div>
                 </div>
 
-                <div className="campaign-studio__filter-control">
-                  <label
-                    className="campaign-studio__filter-label"
-                    htmlFor="campaign-date-to"
-                  >
-                    To:
-                  </label>
-                  <input
-                    id="campaign-date-to"
-                    type="date"
-                    className="campaign-studio__filter-select"
-                    value={dateTo}
-                    min={dateFrom || undefined}
-                    onChange={(e) => setDateTo(e.target.value)}
-                  />
-                </div>
-              </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {/* Sort */}
+                  <div className="campaign-studio__sort-group">
+                    <select
+                      id="sort-by"
+                      className="campaign-studio__sort-select"
+                      value={sortBy}
+                      onChange={(e) =>
+                        setSortBy(
+                          e.target.value as 'newest' | 'name' | 'recipients'
+                        )
+                      }
+                      aria-label="Sort campaigns by"
+                    >
+                      <option value="newest">Sort: Newest first</option>
+                      <option value="name">Sort: Name (A–Z)</option>
+                      <option value="recipients">Sort: Recipients (High–Low)</option>
+                    </select>
+                  </div>
 
-              {/* Sort */}
-              <div className="campaign-studio__filter-row">
-                <div className="campaign-studio__filter-control campaign-studio__filter-control--sort">
-                  <label
-                    className="campaign-studio__filter-label"
-                    htmlFor="sort-by"
-                  >
-                    Sort:
-                  </label>
-
-                  <select
-                    id="sort-by"
-                    className="campaign-studio__filter-select"
-                    value={sortBy}
-                    onChange={(e) =>
-                      setSortBy(
-                        e.target.value as
-                        | 'newest'
-                        | 'name'
-                        | 'recipients'
-                      )
-                    }
-                  >
-                    <option value="newest">
-                      Newest first
-                    </option>
-
-                    <option value="name">
-                      Name (A-Z)
-                    </option>
-
-                    <option value="recipients">
-                      Recipients (high to low)
-                    </option>
-                  </select>
+                  {hasActiveFilters && (
+                    <button
+                      type="button"
+                      className="campaign-studio__clear-btn"
+                      onClick={clearFilters}
+                      title="Clear all filters"
+                    >
+                      Reset filters
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -843,7 +861,7 @@ export function CampaignStudio() {
                   <tr>
                     <th>Created At</th>
                     <th>Sent At</th>
-                    <th>Campaign Subject</th>
+                    <th>Campaign & Subject</th>
                     <th>Email Status</th>
                     <th>Delivery Status</th>
                     <th className="campaign-studio__actions-cell">
@@ -881,7 +899,12 @@ export function CampaignStudio() {
 
                         {/* Subject */}
                         <td>
-                          <span className="campaign-studio__campaign-subject campaign-studio__campaign-subject--primary">
+                          {campaign.name && (
+                            <span className="campaign-studio__campaign-name">
+                              {campaign.name}
+                            </span>
+                          )}
+                          <span className="campaign-studio__campaign-subject">
                             {campaign.subject}
                           </span>
                         </td>

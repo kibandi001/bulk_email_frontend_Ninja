@@ -6,7 +6,7 @@ import { getCampaignStatsSummary } from '../../services/campaignStatsService';
 import type { CampaignStatsSummary } from '../../types/campaignStats';
 import { DateRangeFilter } from '../../components/ui/DateRangeFilter';
 
-// Importing the Tabler Icons based on your new mapping
+// Importing the Tabler Icons based on your mapping
 import { 
   IconMessageShare, 
   IconMailbox, 
