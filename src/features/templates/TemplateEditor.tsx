@@ -111,6 +111,19 @@ export function TemplateEditor() {
     };
   }, []);
 
+  // onReady passes the editor instance directly, bypassing the need for
+  // the options object and fixing the TS error.
+  const onEmailEditorReady: EmailEditorProps['onReady'] = (editor) => {
+    if (!draft.designJson) return;
+    const parsed = JSONTemplateEmailSchema.safeParse(draft.designJson);
+    if (parsed.success) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      editor.loadDesign(parsed.data as any);
+    } else {
+      console.error('Design JSON validation failed', parsed.error);
+    }
+  };
+
   function insertMergeField(field: string) {
     const textarea = bodyRef.current;
     const currentBody = draft.bodyPreview;
@@ -402,21 +415,8 @@ export function TemplateEditor() {
                 ref={emailEditorRef}
                 style={{ width: '100%', height: '100%', flex: 1, minHeight: 0 }}
                 minHeight={600}
-                options={{ 
-                  mergeTags: UNLAYER_MERGE_TAGS, 
-                  displayMode: 'email',
-                  onLoad: () => {
-                    if (draft.designJson) {
-                      const parsed = JSONTemplateEmailSchema.safeParse(draft.designJson);
-                      if (parsed.success) {
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        emailEditorRef.current?.editor?.loadDesign(parsed.data as any);
-                      } else {
-                        console.error('Design JSON validation failed', parsed.error);
-                      }
-                    }
-                  }
-                }}
+                onReady={onEmailEditorReady}
+                options={{ mergeTags: UNLAYER_MERGE_TAGS, displayMode: 'email' }}
               />
             </div>
           </div>
