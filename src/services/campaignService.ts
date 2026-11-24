@@ -1,6 +1,6 @@
 
 
-import { apiClient } from './apiClient';
+import { ApiError, apiClient } from './apiClient';
 import type { Campaign, CampaignDraft } from '../types';
 
 interface RawCampaign {
@@ -71,10 +71,28 @@ function normalizeStatus(value: unknown): Campaign['status'] {
 }
 
 function toCampaign(raw: RawCampaign): Campaign {
+  const subjectValue = (
+    raw.subject ??
+    raw.campaign_subject ??
+    (raw as any).email_subject ??
+    (raw as any).subject_line ??
+    (raw as any).title ??
+    ''
+  ).trim();
+
+  const nameValue = (
+    raw.name ??
+    raw.title ??
+    raw.campaign_name ??
+    ''
+  ).trim() || `Campaign ${raw.id}`;
+
+  const bodyValue = raw.body ?? raw.html ?? (raw as any).content ?? undefined;
+
   return {
     id: String(raw.id),
-    name: (raw.name ?? raw.title ?? raw.campaign_name ?? '').trim() || `Campaign ${raw.id}`,
-    subject: (raw.subject ?? raw.campaign_subject ?? '').trim(),
+    name: nameValue,
+    subject: subjectValue,
     status: normalizeStatus(raw.status),
     recipients: numberValue(raw.recipients ?? raw.recipient_count),
     targetGroup: raw.targetGroup ?? raw.target_group ?? raw.list_name ?? raw.list ?? undefined,
@@ -86,10 +104,16 @@ function toCampaign(raw: RawCampaign): Campaign {
     bounceRate: optionalNumber(raw.bounceRate ?? raw.bounce_rate),
     emailStatus: raw.emailStatus ?? raw.email_status ?? undefined,
     deliveryStatus: raw.deliveryStatus ?? raw.delivery_status ?? undefined,
-    body: raw.body ?? raw.html ?? undefined,
+    body: bodyValue,
     fromEmail: raw.fromEmail ?? raw.from_email ?? undefined,
     sender: raw.sender ?? undefined,
     template: raw.template == null ? undefined : String(raw.template),
+    groupIds: Array.isArray((raw as any).group_ids) ? (raw as any).group_ids.map(Number) : undefined,
+    recipientIds: Array.isArray((raw as any).recipient_ids) ? (raw as any).recipient_ids.map(Number) : undefined,
+    frequency: (raw as any).frequency ?? undefined,
+    startDate: (raw as any).start_date ?? undefined,
+    endDate: (raw as any).end_date ?? undefined,
+    startTime: (raw as any).start_time ?? undefined,
   };
 }
 
@@ -106,29 +130,85 @@ function extractCampaign(payload: SingleCampaignResponse): Campaign {
   return toCampaign(payload as RawCampaign);
 }
 
-function buildCampaignPayload(
-  draft: Partial<CampaignDraft>,
-  status = 'draft',
-  schedule?: { scheduledFor?: string; startDate?: string; endDate?: string; scheduleType?: string },
-) {
-  const body: Record<string, unknown> = {
-    name: draft.name?.trim() ?? '',
-    subject: draft.subject?.trim() ?? '',
-    body: draft.body?.trim() ?? '',
-    from_email: draft.fromEmail?.trim() ?? '',
-    sender: draft.sender?.trim() ?? '',
-    status,
-    is_active: true,
-  };
+export interface CreateCampaignOptions {
+  recipient_ids?: number[];
+  group_ids?: number[];
+  frequency?: string;
+  start_date?: string;
+  end_date?: string;
+  start_time?: string | null;
+  attachments?: File[];
+}
 
-  if (draft.template) body.template = draft.template;
-  if (draft.targetGroup !== undefined) body.target_group = draft.targetGroup.trim();
-  if (draft.abTest !== undefined) body.ab_test = draft.abTest;
-  if (schedule?.scheduledFor) body.scheduled_for = schedule.scheduledFor;
-  if (schedule?.startDate) body.start_date = schedule.startDate;
-  if (schedule?.endDate) body.end_date = schedule.endDate;
-  if (schedule?.scheduleType) body.schedule_type = schedule.scheduleType;
-  return body;
+export function getTodayDate(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function addDaysToDate(dateStr: string, days = 1): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (!y || !m || !d) return getTodayDate();
+  const dt = new Date(Date.UTC(y, m - 1, d + days));
+  const year = dt.getUTCFullYear();
+  const month = String(dt.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(dt.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function buildCampaignData(
+  draft: Partial<CampaignDraft>,
+  options: CreateCampaignOptions = {}
+): FormData | Record<string, unknown> {
+  const attachments = options.attachments || draft.attachments || [];
+  const hasFiles = Array.isArray(attachments) && attachments.length > 0 && attachments[0] instanceof File;
+
+  const today = getTodayDate();
+  const name = draft.name?.trim() ?? '';
+  const subject = draft.subject?.trim() ?? '';
+  const body = draft.body?.trim() ?? '';
+  const from_email = draft.fromEmail?.trim() || 'help@tililtech.com';
+  const frequency = options.frequency || draft.frequency || 'immediately';
+  const start_date = options.start_date || draft.start_date || today;
+  const rawEndDate = options.end_date || draft.end_date || '';
+  const end_date = rawEndDate && rawEndDate > start_date ? rawEndDate : addDaysToDate(start_date, 1);
+  const start_time = options.start_time ?? draft.start_time ?? null;
+  const recipient_ids = options.recipient_ids || draft.recipient_ids || [];
+  const group_ids = options.group_ids || draft.group_ids || [];
+
+  if (hasFiles) {
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('subject', subject);
+    formData.append('body', body);
+    formData.append('from_email', from_email);
+    formData.append('frequency', frequency);
+    formData.append('start_date', start_date);
+    formData.append('end_date', end_date);
+    if (start_time) formData.append('start_time', start_time);
+
+    recipient_ids.forEach((id: number) => formData.append('recipient_ids', String(id)));
+    group_ids.forEach((id: number) => formData.append('group_ids', String(id)));
+    attachments.forEach((file: File) => formData.append('attachments', file));
+
+    return formData;
+  }
+
+  return {
+    name,
+    recipient_ids,
+    group_ids,
+    subject,
+    body,
+    frequency,
+    start_date,
+    end_date,
+    from_email,
+    start_time,
+    attachments: [],
+  };
 }
 
 export async function listCampaigns(): Promise<Campaign[]> {
@@ -137,48 +217,89 @@ export async function listCampaigns(): Promise<Campaign[]> {
 }
 
 export async function getCampaign(campaignId: string): Promise<Campaign> {
-  const payload = await apiClient.get<SingleCampaignResponse>(`/campaigns/${encodeURIComponent(campaignId)}/`);
-  return extractCampaign(payload);
+  try {
+    const payload = await apiClient.get<SingleCampaignResponse>(
+      `/mail-campaigns/${encodeURIComponent(campaignId)}/`
+    );
+    return extractCampaign(payload);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      const fallback = await apiClient.get<SingleCampaignResponse>(
+        `/campaigns/${encodeURIComponent(campaignId)}/`
+      );
+      return extractCampaign(fallback);
+    }
+    throw err;
+  }
 }
 
-export async function createCampaignDraft(draft: CampaignDraft, recipientsCount = 0): Promise<Campaign> {
-  const payload = await apiClient.post<SingleCampaignResponse>('/campaigns/', {
-    ...buildCampaignPayload(draft, 'draft'),
-    recipients: recipientsCount,
-  });
-  return extractCampaign(payload);
+export async function createCampaignDraft(
+  draft: CampaignDraft,
+  optionsOrCount: CreateCampaignOptions | number = {}
+): Promise<Campaign> {
+  const options: CreateCampaignOptions =
+    typeof optionsOrCount === 'number' ? {} : optionsOrCount;
+  const payload = buildCampaignData(draft, options);
+  const res = await apiClient.post<SingleCampaignResponse>('/mail-campaigns/', payload);
+  return extractCampaign(res);
 }
 
-export async function updateCampaign(campaignId: string, draft: Partial<CampaignDraft>): Promise<Campaign> {
-  const payload = await apiClient.patch<SingleCampaignResponse>(
-    `/campaigns/${encodeURIComponent(campaignId)}/`,
-    buildCampaignPayload(draft, 'draft'),
-  );
-  return extractCampaign(payload);
+export async function updateCampaign(
+  campaignId: string,
+  draft: Partial<CampaignDraft>,
+  options: CreateCampaignOptions = {}
+): Promise<Campaign> {
+  const payload = buildCampaignData(draft, options);
+  try {
+    const res = await apiClient.patch<SingleCampaignResponse>(
+      `/mail-campaigns/${encodeURIComponent(campaignId)}/`,
+      payload
+    );
+    return extractCampaign(res);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      const res = await apiClient.patch<SingleCampaignResponse>(
+        `/campaigns/${encodeURIComponent(campaignId)}/`,
+        payload
+      );
+      return extractCampaign(res);
+    }
+    throw err;
+  }
 }
 
 export async function sendCampaign(campaignId: string): Promise<Campaign> {
-  const payload = await apiClient.post<SingleCampaignResponse>(`/campaigns/${encodeURIComponent(campaignId)}/send/`);
-  return extractCampaign(payload);
+  try {
+    const payload = await apiClient.post<SingleCampaignResponse>(
+      `/mail-campaigns/${encodeURIComponent(campaignId)}/send/`
+    );
+    return extractCampaign(payload);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      return getCampaign(campaignId);
+    }
+    throw err;
+  }
 }
 
 export interface ScheduleCampaignInput {
   scheduledFor: string;
   startDate: string;
   endDate: string;
+  startTime?: string;
   scheduleType: 'once' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom';
 }
 
 export async function scheduleCampaign(campaignId: string, schedule: ScheduleCampaignInput): Promise<Campaign> {
+  const startDate = schedule.startDate || getTodayDate();
+  const endDate = schedule.endDate && schedule.endDate > startDate ? schedule.endDate : addDaysToDate(startDate, 1);
   const payload = await apiClient.patch<SingleCampaignResponse>(
-    `/campaigns/${encodeURIComponent(campaignId)}/`,
+    `/mail-campaigns/${encodeURIComponent(campaignId)}/`,
     {
-      status: 'scheduled',
-      scheduled_for: schedule.scheduledFor,
-      start_date: schedule.startDate,
-      end_date: schedule.endDate,
-      schedule_type: schedule.scheduleType,
-      is_active: true,
+      frequency: schedule.scheduleType,
+      start_date: startDate,
+      end_date: endDate,
+      ...(schedule.startTime ? { start_time: schedule.startTime } : {}),
     },
   );
   return extractCampaign(payload);
@@ -375,12 +496,62 @@ export async function getCampaignHistoryEmails(historyId: string | number): Prom
   }));
 }
 
-export async function sendTestEmail(payload: { to: string; subject: string; html: string }): Promise<unknown> {
-  return apiClient.post('/send-test-mail/', { ...payload, attachments: [] });
+export interface SendTestEmailPayload {
+  to: string;
+  subject: string;
+  html: string;
+  from_email?: string;
+  sender?: string;
+  attachments?: Record<string, unknown> | unknown[];
+}
+
+interface TestEmailGatewayResponse {
+  status_code?: number | string;
+  message?: string;
+  response_data?: {
+    status_code?: string | number;
+    status_desc?: string;
+    email_id?: string | number;
+    to?: string;
+  };
+}
+
+export async function sendTestEmail(payload: SendTestEmailPayload): Promise<unknown> {
+  const fromEmail = payload.from_email?.trim() || 'help@tililtech.com';
+  const senderName = payload.sender?.trim() || 'Tilil Technologies';
+
+  const targetEmail = payload.to?.trim() ?? '';
+
+  const res = await apiClient.post<TestEmailGatewayResponse>('/send-test-mail/', {
+    subject: payload.subject?.trim() ?? '',
+    html: payload.html?.trim() ?? '',
+    from: fromEmail,
+    to: targetEmail,
+    sender: senderName,
+    attachments: payload.attachments ?? {},
+  });
+
+  // Check if the downstream mail gateway rejected the dispatch
+  if (res && typeof res === 'object') {
+    const gateway = res.response_data;
+    if (gateway && typeof gateway === 'object') {
+      const code = String(gateway.status_code ?? '');
+      if (code && code !== '1000' && code !== '200') {
+        const desc = gateway.status_desc || 'Gateway rejected test email';
+        throw new Error(`Gateway Error (${code}): ${desc}`);
+      }
+    }
+  }
+
+  return res;
 }
 
 export async function deleteCampaign(campaignId: string): Promise<void> {
-  await apiClient.delete<void>(`/campaigns/${encodeURIComponent(campaignId)}/`);
+  try {
+    await apiClient.delete<void>(`/mail-campaigns/${encodeURIComponent(campaignId)}/`);
+  } catch {
+    await apiClient.delete<void>(`/campaigns/${encodeURIComponent(campaignId)}/`);
+  }
 }
 
 export const saveCampaignDraft = createCampaignDraft;

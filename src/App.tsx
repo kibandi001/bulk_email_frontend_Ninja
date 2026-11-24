@@ -227,6 +227,7 @@ import { ResetPassword } from './features/auth/ResetPassword';
 import { AcceptInvitation } from './features/auth/AcceptInvitation';
 import { Dashboard } from './features/dashboard/Dashboard';
 import { CampaignStudio } from './features/campaigns/CampaignStudio';
+import { CustomEmail } from './features/campaigns/CustomEmail';
 import { TemplateLibrary } from './features/templates/TemplateLibrary';
 import { TemplateEditor } from './features/templates/TemplateEditor';
 import { Contacts } from './features/audience/Contacts';
@@ -248,6 +249,7 @@ import type { UserRole } from './types';
 const TITLES: Record<string, string> = {
   '/': 'Dashboard',
   '/campaigns': 'Campaign Studio',
+  '/custom-email': 'Custom Email',
   '/templates': 'Template Library',
   '/contacts': 'Contacts & Lists',
   '/hygiene': 'Data Hygiene',
@@ -307,6 +309,14 @@ export default function App() {
             element={
               <RequireRole roles={['admin', 'campaign_manager']}>
                 <CampaignStudio />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/custom-email"
+            element={
+              <RequireRole roles={['admin', 'campaign_manager']}>
+                <CustomEmail />
               </RequireRole>
             }
           />

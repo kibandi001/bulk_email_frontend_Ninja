@@ -169,3 +169,120 @@
   color: #fff;
   border-color: var(--blueprint);
 }
+
+/* ==================================================== */
+/* MODAL STYLES (Add/Edit Contact & Add/Edit Group)      */
+/* ==================================================== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+  padding: 16px;
+  animation: contactsModalFadeIn 0.15s ease-out;
+}
+
+@keyframes contactsModalFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal-content {
+  background: #ffffff;
+  border-radius: 12px;
+  width: min(500px, 94vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px -10px rgba(15, 23, 42, 0.3), 0 0 0 1px rgba(0, 0, 0, 0.08);
+  padding: 24px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line, #e2e8f0);
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.modal-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  line-height: 1;
+  transition: all 0.15s ease;
+}
+
+.modal-close:hover {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.modal-content .field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 6px;
+}
+
+.modal-content .field input,
+.modal-content .field select,
+.modal-content .field textarea {
+  width: 100%;
+  padding: 9px 12px;
+  font-size: 13.5px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1e293b;
+  box-sizing: border-box;
+  font-family: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.modal-content .field input:focus,
+.modal-content .field select:focus,
+.modal-content .field textarea:focus {
+  outline: none;
+  border-color: #1c5a8c;
+  box-shadow: 0 0 0 3px rgba(28, 90, 140, 0.15);
+}
+
+.modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line, #e2e8f0);
+}

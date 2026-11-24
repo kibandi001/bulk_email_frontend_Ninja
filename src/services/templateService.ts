@@ -52,13 +52,36 @@ function fromTMailRecord(record: TMailTemplateRecord): EmailTemplate {
 
   const body = record?.content ?? '';
 
+  let designJson: Record<string, unknown> | undefined = undefined;
+  const rawJson = record?.json_data || (record as any)?.design_json || (record as any)?.designJson;
+  if (rawJson) {
+    if (typeof rawJson === 'string') {
+      try {
+        designJson = JSON.parse(rawJson);
+      } catch {
+        designJson = undefined;
+      }
+    } else if (typeof rawJson === 'object' && rawJson !== null) {
+      designJson = rawJson as Record<string, unknown>;
+    }
+  }
+
+  // Retrieve subject if present in record or designJson._meta
+  const subject =
+    (record as any)?.subject ||
+    (record as any)?.subject_preview ||
+    (record as any)?.subjectPreview ||
+    (designJson?._meta as any)?.subject ||
+    '';
+
   return {
     id: String(record.id),
     name: safeName,
-    updatedAt: record.updated_at ?? record.created_at ?? new Date().toISOString(),
-    subjectPreview: '', // TMail API template records don't store subject directly
+    updatedAt: record?.updated_at ?? record?.created_at ?? new Date().toISOString(),
+    subjectPreview: subject,
     bodyPreview: body,
     mergeFields: [...new Set(body.match(/{{\s*[\w.]+\s*}}/g) ?? [])],
+    designJson,
   };
 }
 
@@ -70,7 +93,16 @@ function toTMailFormData(draft: TemplateDraft, fileFieldName: 'files' | 'attachm
   const safeName = draft.name.trim() || 'Untitled Template';
   fd.append('name', safeName);
   fd.append('content', draft.bodyPreview);
-  fd.append('json_data', JSON.stringify(draft.designJson ?? {}));
+  if (draft.subjectPreview) {
+    fd.append('subject', draft.subjectPreview);
+  }
+
+  const jsonPayload = {
+    ...(draft.designJson ?? {}),
+    _meta: { subject: draft.subjectPreview },
+  };
+  fd.append('json_data', JSON.stringify(jsonPayload));
+
   for (const file of draft.files ?? []) {
     fd.append(fileFieldName, file);
   }
@@ -95,12 +127,14 @@ interface TMailSingleResponse {
 
 export async function getTemplate(id: string): Promise<EmailTemplate> {
   const response = await apiClient.get<TMailSingleResponse>(`/mail-templates/${id}`);
-  return fromTMailRecord(response.data);
+  const record = (response as any)?.data ?? response;
+  return fromTMailRecord(record);
 }
 
 export async function createTemplate(draft: TemplateDraft): Promise<EmailTemplate> {
   const response = await apiClient.post<TMailSingleResponse>('/mail-templates/', toTMailFormData(draft, 'files'));
-  return fromTMailRecord(response.data);
+  const record = (response as any)?.data ?? response;
+  return fromTMailRecord(record);
 }
 
 export async function updateTemplate(id: string, draft: TemplateDraft): Promise<EmailTemplate> {
@@ -108,7 +142,8 @@ export async function updateTemplate(id: string, draft: TemplateDraft): Promise<
     `/mail-templates/${id}/`,
     toTMailFormData(draft, 'attachments')
   );
-  return fromTMailRecord(response.data);
+  const record = (response as any)?.data ?? response;
+  return fromTMailRecord(record);
 }
 
 export async function duplicateTemplate(id: string): Promise<EmailTemplate> {

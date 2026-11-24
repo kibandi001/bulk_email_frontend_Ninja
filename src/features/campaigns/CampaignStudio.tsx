@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
+  addDaysToDate,
   createCampaignDraft,
   deleteCampaign,
   getCampaign,
   getCampaignHistory,
+  getTodayDate,
   listCampaigns,
   sendCampaign,
   scheduleCampaign,
@@ -15,10 +17,11 @@ import {
 } from '../../services/campaignService';
 import { getTemplate, listTemplates } from '../../services/templateService';
 import type { Campaign, EmailTemplate } from '../../types';
+import type { SubscriberGroup } from '../../types/subscriber';
 import { SentMailTable } from '../message-log/Messages';
 import { Card } from '../../components/ui/Card';
 import './CampaignStudio.css';
-import { listPaginatedSubscribers } from '../../services/subscriberService';
+import { listPaginatedSubscribers, listSubscriberGroups } from '../../services/subscriberService';
 
 type CampaignDisplay = Campaign & {
   sentAt?: string | null;
@@ -44,13 +47,13 @@ export function CampaignStudio() {
   const [templateId, setTemplateId] = useState<string>('');
   const [abTest, setAbTest] = useState(false);
   const [body, setBody] = useState('');
-  const [fromEmail, setFromEmail] = useState('');
-  const [sender, setSender] = useState('');
+  const [fromEmail, setFromEmail] = useState('help@tililtech.com');
+  const [sender, setSender] = useState('Tilil Technologies');
   const [contentMode, setContentMode] = useState<'text' | 'template'>('text');
   const [testEmail, setTestEmail] = useState('');
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [scheduleChoice, setScheduleChoice] = useState<'once' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom' | ''>('');
-  const [scheduleStartDate, setScheduleStartDate] = useState('');
+  const [scheduleStartDate, setScheduleStartDate] = useState(() => getTodayDate());
   const [scheduleEndDate, setScheduleEndDate] = useState('');
   const [scheduleTime, setScheduleTime] = useState('09:00');
   const [showSendPreview, setShowSendPreview] = useState(false);
@@ -65,6 +68,15 @@ export function CampaignStudio() {
   const [historyCampaign, setHistoryCampaign] = useState<CampaignDisplay | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyEmailEntry, setHistoryEmailEntry] = useState<CampaignHistoryEntry | null>(null);
+
+  // Groups & Attachments state
+  const [groups, setGroups] = useState<SubscriberGroup[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('');
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const lastSavedIdRef = useRef<string | null>(null);
+  const loadedEditIdRef = useRef<string | null>(null);
+  const templateInitializedRef = useRef(false);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -83,41 +95,80 @@ export function CampaignStudio() {
 
   useEffect(() => {
     reloadCampaigns();
+    listSubscriberGroups()
+      .then(setGroups)
+      .catch((err) => console.error('Failed to load subscriber groups:', err));
   }, []);
 
   useEffect(() => {
     listTemplates().then((loaded) => {
       setTemplates(loaded);
-      const requested = searchParams.get('templateId');
-      if (requested) {
+      const requested = searchParams.get('templateId') || searchParams.get('template');
+      if (requested && !templateInitializedRef.current) {
+        templateInitializedRef.current = true;
         const initial = loaded.find((t) => t.id === requested);
         if (initial) {
           setTemplateId(initial.id);
           setContentMode('template');
-          setSubject(initial.subjectPreview);
-          setBody(initial.bodyPreview);
+          setSubject(initial.subjectPreview || '');
+          setBody(initial.bodyPreview || '');
         }
       }
     });
-  }, [searchParams]);
+  }, []); // Run on mount only to prevent wiping custom subject lines
 
   useEffect(() => {
-    if (!editId) return;
+    if (!editId) {
+      loadedEditIdRef.current = null;
+      return;
+    }
+
+    // Prevent re-fetching if this campaign is already loaded into form
+    if (loadedEditIdRef.current === editId || lastSavedIdRef.current === editId) {
+      return;
+    }
+    loadedEditIdRef.current = editId;
 
     setIsLoadingEditor(true);
     setFeedbackMessage(null);
 
     getCampaign(editId)
       .then((campaign) => {
-        setName(campaign.name);
-        setSubject(campaign.subject);
-        setBody(campaign.body || '');
-        setFromEmail(campaign.fromEmail || '');
-        setSender(campaign.sender || '');
+        if (campaign.name) setName(campaign.name);
+        if (campaign.subject) setSubject(campaign.subject);
+        if (campaign.body) setBody(campaign.body);
+        if (campaign.fromEmail) setFromEmail(campaign.fromEmail);
+        if (campaign.sender) setSender(campaign.sender);
         setAbTest(false);
         setContentMode(campaign.template ? 'template' : 'text');
-        setTemplateId('');
+        setTemplateId(campaign.template || '');
         setRecipientEstimate(campaign.recipients ?? 0);
+        setAttachments([]);
+
+        // Populate selected group if available
+        if (campaign.groupIds && campaign.groupIds.length > 0) {
+          setSelectedGroupId(String(campaign.groupIds[0]));
+        } else if (campaign.targetGroup) {
+          const match = groups.find((g) => g.name.toLowerCase() === campaign.targetGroup?.toLowerCase());
+          if (match) setSelectedGroupId(String(match.id));
+        }
+
+        // Populate schedule fields if campaign was scheduled
+        if (campaign.frequency && campaign.frequency !== 'immediately') {
+          setScheduleChoice(campaign.frequency as any);
+          if (campaign.startDate) setScheduleStartDate(campaign.startDate);
+          if (campaign.endDate) setScheduleEndDate(campaign.endDate);
+          if (campaign.startTime) setScheduleTime(campaign.startTime.slice(0, 5));
+        } else if (campaign.scheduledFor) {
+          try {
+            const dt = new Date(campaign.scheduledFor);
+            if (!isNaN(dt.getTime())) {
+              setScheduleChoice('once');
+              setScheduleStartDate(dt.toISOString().slice(0, 10));
+              setScheduleTime(dt.toTimeString().slice(0, 5));
+            }
+          } catch {}
+        }
       })
       .catch((error) => {
         alert(error instanceof Error ? error.message : 'Could not load campaign for editing.');
@@ -137,12 +188,48 @@ export function CampaignStudio() {
   }, [historyId, campaigns]);
 
   useEffect(() => {
-    if (!editId){
-      listPaginatedSubscribers({ limit: 1, is_subscribed: true})
-      .then((res)=> setRecipientEstimate(res.count ?? 0))
-      .catch(()=> setRecipientEstimate(0)); 
+    if (editId) return;
+    if (selectedGroupId) {
+      const g = groups.find((grp) => String(grp.id) === selectedGroupId);
+      if (g && typeof g.num_subscribers === 'number') {
+        setRecipientEstimate(g.num_subscribers);
+        return;
+      }
     }
-  }, [editId]);
+    listPaginatedSubscribers({ limit: 1, is_subscribed: true })
+      .then((res) => setRecipientEstimate(res.count ?? 0))
+      .catch(() => setRecipientEstimate(0));
+  }, [editId, selectedGroupId, groups]);
+
+  function startNewCampaign() {
+    loadedEditIdRef.current = null;
+    lastSavedIdRef.current = null;
+    setName('');
+    setSubject('');
+    setBody('');
+    setFromEmail('help@tililtech.com');
+    setSender('Tilil Technologies');
+    setAbTest(false);
+    setContentMode('text');
+    setTemplateId('');
+    setAttachments([]);
+    setSelectedGroupId('');
+    setScheduleChoice('');
+    setScheduleStartDate(getTodayDate());
+    setScheduleEndDate('');
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    if (e.target.files && e.target.files.length > 0) {
+      const newFiles = Array.from(e.target.files);
+      setAttachments((prev) => [...prev, ...newFiles]);
+    }
+    if (e.target) e.target.value = '';
+  }
+
+  function handleRemoveAttachment(index: number) {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  }
 
   const selectedTemplate = templates.find(
     (t) => t.id === templateId
@@ -246,39 +333,71 @@ export function CampaignStudio() {
   ]);
 
   async function handleSaveDraft() {
-    if (!name.trim() || !subject.trim()) {
-      alert('Please enter a campaign name and subject line.');
+    const finalName = name.trim() || subject.trim();
+    const finalSubject = subject.trim() || name.trim();
+
+    if (!finalName && !finalSubject) {
+      alert('Please enter a campaign name or subject line.');
       return;
     }
 
+    if (!name.trim()) setName(finalName);
+    if (!subject.trim()) setSubject(finalSubject);
 
     setIsSaving(true);
 
     try {
+      const targetGroupName = selectedGroupId
+        ? groups.find((g) => String(g.id) === selectedGroupId)?.name || 'Group'
+        : 'All Subscribers';
+
       const payload = {
-        name,
-        subject,
+        name: finalName,
+        subject: finalSubject,
         body,
         fromEmail,
         sender,
         template: contentMode === 'template' ? templateId : '',
-        targetGroup: 'All Subscribers',
+        targetGroup: targetGroupName,
         abTest,
       };
 
+      const resolvedFrequency = scheduleChoice || 'immediately';
+      const resolvedStartDate = scheduleStartDate || getTodayDate();
+      const resolvedEndDate =
+        resolvedFrequency === 'immediately' || resolvedFrequency === 'once'
+          ? addDaysToDate(resolvedStartDate, 1)
+          : (scheduleEndDate && scheduleEndDate > resolvedStartDate
+              ? scheduleEndDate
+              : addDaysToDate(resolvedStartDate, 1));
+
+      const options = {
+        group_ids: selectedGroupId ? [Number(selectedGroupId)] : [],
+        frequency: resolvedFrequency,
+        start_date: resolvedStartDate,
+        end_date: resolvedEndDate,
+        start_time: scheduleTime ? (scheduleTime.length === 5 ? `${scheduleTime}:00` : scheduleTime) : null,
+        attachments,
+      };
+
       const saved = editId
-        ? await updateCampaign(editId, payload)
-        : await createCampaignDraft(payload, recipientEstimate ?? 0);
+        ? await updateCampaign(editId, payload, options)
+        : await createCampaignDraft(payload, options);
+
+      if (saved.id && saved.id !== 'undefined') {
+        lastSavedIdRef.current = saved.id;
+        loadedEditIdRef.current = saved.id;
+      }
 
       setFeedbackMessage(
         editId
-          ? `Campaign "${saved.name}" updated successfully.`
-          : `Campaign "${saved.name}" saved as draft. You can now continue editing, schedule it, or send it.`
+          ? `Campaign "${saved.name || finalName}" updated successfully.`
+          : `Campaign "${saved.name || finalName}" saved as draft. You can now continue editing, schedule it, or send it.`
       );
 
       await reloadCampaigns();
 
-      if (!editId) {
+      if (!editId && saved.id && saved.id !== 'undefined') {
         navigate(`?edit=${encodeURIComponent(saved.id)}`, { replace: true });
       }
     } catch (error) {
@@ -290,57 +409,98 @@ export function CampaignStudio() {
   }
 
   function resolveSchedule(): { scheduledFor: string; startDate: string; endDate: string } | null {
-    const endDate = scheduleChoice === 'once' ? scheduleStartDate : scheduleEndDate;
-    if (!scheduleChoice || !scheduleStartDate || !endDate || !scheduleTime) return null;
+    if (!scheduleChoice || !scheduleStartDate || !scheduleTime) return null;
+    const endDate = scheduleChoice === 'once' ? addDaysToDate(scheduleStartDate, 1) : scheduleEndDate;
+    if (!endDate) return null;
     const scheduledFor = new Date(`${scheduleStartDate}T${scheduleTime}`).toISOString();
     return { scheduledFor, startDate: scheduleStartDate, endDate };
   }
 
   async function ensureCampaignId(): Promise<string | null> {
-    if (!name.trim() || !subject.trim() || !body.trim()) {
-      alert('Please complete the campaign name, subject and email content first.');
+    const finalName = name.trim() || subject.trim();
+    const finalSubject = subject.trim() || name.trim();
+
+    if ((!finalName && !finalSubject) || !body.trim()) {
+      alert('Please complete the subject line and email content first.');
       return null;
     }
 
+    if (!name.trim()) setName(finalName);
+    if (!subject.trim()) setSubject(finalSubject);
+
+    const targetGroupName = selectedGroupId
+      ? groups.find((g) => String(g.id) === selectedGroupId)?.name || 'Group'
+      : 'All Subscribers';
+
     const payload = {
-      name,
-      subject,
+      name: finalName,
+      subject: finalSubject,
       body,
       fromEmail,
       sender,
       template: contentMode === 'template' ? templateId : '',
-      targetGroup: 'All Subscribers',
+      targetGroup: targetGroupName,
       abTest,
     };
 
+    const resolvedFrequency = pendingAction === 'send' ? 'immediately' : (scheduleChoice || 'immediately');
+    const resolvedStartDate = scheduleStartDate || getTodayDate();
+    const resolvedEndDate =
+      resolvedFrequency === 'immediately' || resolvedFrequency === 'once'
+        ? addDaysToDate(resolvedStartDate, 1)
+        : (scheduleEndDate && scheduleEndDate > resolvedStartDate
+            ? scheduleEndDate
+            : addDaysToDate(resolvedStartDate, 1));
+
+    const options = {
+      group_ids: selectedGroupId ? [Number(selectedGroupId)] : [],
+      frequency: resolvedFrequency,
+      start_date: resolvedStartDate,
+      end_date: resolvedEndDate,
+      start_time: scheduleTime ? (scheduleTime.length === 5 ? `${scheduleTime}:00` : scheduleTime) : null,
+      attachments,
+    };
+
     if (editId) {
-      const saved = await updateCampaign(editId, payload);
+      const saved = await updateCampaign(editId, payload, options);
+      lastSavedIdRef.current = saved.id;
+      loadedEditIdRef.current = saved.id;
       setCampaigns((current) => current.map((c) => (c.id === saved.id ? saved : c)));
       return saved.id;
     }
 
-    const saved = await createCampaignDraft(payload, recipientEstimate ?? 0);
+    const saved = await createCampaignDraft(payload, options);
+    lastSavedIdRef.current = saved.id;
+    loadedEditIdRef.current = saved.id;
     setCampaigns((current) => [saved, ...current]);
     return saved.id;
   }
 
   function handleSendNow() {
-    if (!name.trim() || !subject.trim() || !body.trim()) {
-      alert('Complete the campaign name, subject and email content first.');
+    const finalName = name.trim() || subject.trim();
+    const finalSubject = subject.trim() || name.trim();
+    if ((!finalName && !finalSubject) || !body.trim()) {
+      alert('Complete the subject line and email content first.');
       return;
     }
+    if (!name.trim()) setName(finalName);
+    if (!subject.trim()) setSubject(finalSubject);
     setPendingAction('send');
     setShowSendPreview(true);
   }
 
   function handleSchedule() {
+    const finalName = name.trim() || subject.trim();
+    const finalSubject = subject.trim() || name.trim();
+    if (!name.trim() && finalName) setName(finalName);
+    if (!subject.trim() && finalSubject) setSubject(finalSubject);
     const resolved = resolveSchedule();
     if (!resolved) {
       alert(scheduleChoice === 'once' ? 'Choose a date and time.' : 'Choose a schedule type, start date, end date and time.');
       return;
     }
-    if (new Date(resolved.endDate) < new Date(resolved.startDate)) {
-      alert('The end date cannot be before the start date.');
+    if (resolved.endDate <= resolved.startDate) {
+      alert('The end date must be after the start date.');
       return;
     }
     setPendingAction('schedule');
@@ -360,7 +520,8 @@ export function CampaignStudio() {
       } else {
         const resolved = resolveSchedule();
         if (!resolved) throw new Error('Schedule details are incomplete.');
-        await scheduleCampaign(id, { ...resolved, scheduleType: scheduleChoice as 'once' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom' });
+        const formattedTime = scheduleTime ? (scheduleTime.length === 5 ? `${scheduleTime}:00` : scheduleTime) : undefined;
+        await scheduleCampaign(id, { ...resolved, startTime: formattedTime, scheduleType: scheduleChoice as 'once' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom' });
         setFeedbackMessage('Campaign scheduled successfully.');
       }
       await reloadCampaigns();
@@ -379,14 +540,37 @@ export function CampaignStudio() {
     setPendingAction(null);
   }
 
+  function formatContentToHtml(content: string): string {
+    const trimmed = content.trim();
+    if (!trimmed) return '';
+    if (/<\/?[a-z][\s\S]*>/i.test(trimmed)) {
+      return trimmed;
+    }
+    return trimmed
+      .split(/\n\s*\n/)
+      .map((paragraph) => {
+        const inner = paragraph
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .join('<br />');
+        return `<p style="margin: 0 0 16px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; line-height: 1.6; color: #1e293b;">${inner}</p>`;
+      })
+      .join('\n');
+  }
+
   async function handleSendTest() {
     if (!testEmail.trim()) {
       alert('Enter a test recipient email address.');
       return;
     }
-    if (!subject.trim()) {
+    const finalSubject = subject.trim() || name.trim();
+    if (!finalSubject) {
       alert('Enter a subject line before sending a test.');
       return;
+    }
+    if (!subject.trim()) {
+      setSubject(finalSubject);
     }
     if (!body.trim()) {
       alert('Enter email content before sending a test.');
@@ -394,8 +578,19 @@ export function CampaignStudio() {
     }
     setIsSendingTest(true);
     try {
-      await sendTestEmail({ to: testEmail.trim(), subject: subject.trim(), html: body });
-      setFeedbackMessage(`Test email sent to ${testEmail.trim()}.`);
+      const senderEmail = fromEmail.trim() || 'help@tililtech.com';
+      const senderName = sender.trim() || 'Tilil Technologies';
+      const htmlFormatted = formatContentToHtml(body);
+
+      await sendTestEmail({
+        to: testEmail.trim(),
+        subject: finalSubject,
+        html: htmlFormatted,
+        from_email: senderEmail,
+        sender: senderName,
+        attachments: {},
+      });
+      setFeedbackMessage(`Test email sent to ${testEmail.trim()} from ${senderEmail}.`);
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Could not send test email.');
     } finally {
@@ -665,6 +860,7 @@ export function CampaignStudio() {
           <Link
             to="?new=1"
             className="btn btn--primary campaign-studio__new-btn"
+            onClick={startNewCampaign}
           >
             <span className="campaign-studio__new-btn-icon">
               +
@@ -1152,6 +1348,21 @@ export function CampaignStudio() {
                 />
               </div>
 
+              <div className="field">
+                <label htmlFor="cgroup">Target Audience / Group</label>
+                <select
+                  id="cgroup"
+                  value={selectedGroupId}
+                  onChange={(e) => setSelectedGroupId(e.target.value)}
+                >
+                  <option value="">All Subscribers ({recipientEstimate !== null ? `${recipientEstimate.toLocaleString()} recipients` : 'All'})</option>
+                  {groups.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name} {g.num_subscribers !== undefined ? `(${g.num_subscribers.toLocaleString()} subscribers)` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
               <div className="campaign-studio__content-choice">
                 <span className="campaign-studio__section-label">Email content</span>
@@ -1170,8 +1381,10 @@ export function CampaignStudio() {
                     if (!id) return;
                     try {
                       const t = await getTemplate(id);
-                      setName(t.name);
-                      setSubject(t.subjectPreview);
+                      setName((prev) => (prev.trim() ? prev : t.name));
+                      if (t.subjectPreview?.trim()) {
+                        setSubject((prev) => (prev.trim() ? prev : t.subjectPreview));
+                      }
                       setBody(htmlToPlainText(t.bodyPreview));
                     } catch (error) {
                       alert(error instanceof Error ? error.message : 'Could not load the selected template.');
@@ -1193,15 +1406,96 @@ export function CampaignStudio() {
                 <textarea id="campaign-body" rows={16} value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write your email here…" />
               </div>
 
-              <div className="campaign-studio__sender-grid">
-                <div className="field">
-                  <label htmlFor="from-email">From email</label>
-                  <input id="from-email" type="email" value={fromEmail} onChange={(e) => setFromEmail(e.target.value)} placeholder="news@example.com" />
+              {/* Attachments Section */}
+              <div className="field">
+                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Attachments</span>
+                  <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 400 }}>
+                    {attachments.length > 0 ? `${attachments.length} file${attachments.length > 1 ? 's' : ''} attached` : 'Optional'}
+                  </span>
+                </label>
+
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  multiple
+                  onChange={handleFileChange}
+                  style={{ display: 'none' }}
+                />
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn--sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                    </svg>
+                    Attach Files
+                  </button>
+                  <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+                    PDF, documents, CSV, or images
+                  </span>
                 </div>
-                <div className="field">
-                  <label htmlFor="sender-name">Sender</label>
-                  <input id="sender-name" value={sender} onChange={(e) => setSender(e.target.value)} placeholder="Example Co" />
-                </div>
+
+                {attachments.length > 0 && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 8,
+                      marginTop: 10,
+                      padding: '10px 12px',
+                      background: 'rgba(16, 35, 58, 0.03)',
+                      border: '1px dashed var(--border)',
+                      borderRadius: 8,
+                    }}
+                  >
+                    {attachments.map((file, idx) => (
+                      <div
+                        key={`${file.name}-${idx}`}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '4px 10px',
+                          background: 'var(--card-bg, #ffffff)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 6,
+                          fontSize: 12,
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                        }}
+                      >
+                        <span style={{ fontSize: 14 }}>📎</span>
+                        <strong style={{ color: 'var(--ink, #1e293b)' }}>{file.name}</strong>
+                        <span style={{ color: 'var(--muted, #64748b)', fontSize: 11 }}>
+                          ({(file.size / 1024).toFixed(1)} KB)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveAttachment(idx)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: 'var(--danger, #ef4444)',
+                            padding: '0 2px',
+                            fontWeight: 'bold',
+                            fontSize: 13,
+                            lineHeight: 1,
+                            marginLeft: 4,
+                          }}
+                          title={`Remove ${file.name}`}
+                          aria-label={`Remove ${file.name}`}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="campaign-studio__checkbox-row">
@@ -1271,7 +1565,11 @@ export function CampaignStudio() {
             <div className="campaign-studio__history-summary">
               <span>Campaign: <strong>{name}</strong></span>
               <span>Subject: <strong>{subject}</strong></span>
+              <span>Audience: <strong>{selectedGroupId ? groups.find(g => String(g.id) === selectedGroupId)?.name || 'Selected Group' : 'All Subscribers'}</strong></span>
               <span>Recipients: <strong>{(recipientEstimate ?? 0).toLocaleString()}</strong></span>
+              {attachments.length > 0 && (
+                <span>Attachments: <strong>{attachments.length} file{attachments.length > 1 ? 's' : ''}</strong></span>
+              )}
               {pendingAction === 'schedule' && scheduleChoice && <span>Schedule: <strong>{scheduleChoice}</strong></span>}
               {pendingAction === 'schedule' && scheduleStartDate && <span>Start: <strong>{scheduleStartDate} {scheduleTime}</strong></span>}
               {pendingAction === 'schedule' && scheduleChoice !== 'once' && scheduleEndDate && <span>End: <strong>{scheduleEndDate}</strong></span>}

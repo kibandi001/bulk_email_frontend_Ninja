@@ -1,4 +1,5 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   listPaginatedSubscribers,
   listSubscriberGroups,
@@ -19,6 +20,19 @@ import { Card } from '../../components/ui/Card';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { useSubscriberEvents } from '../../hooks/useSubscriberEvents';
 import './Contacts.css';
+
+function getPageNumbers(currentPage: number, totalPages: number): (number | '...')[] {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+  if (currentPage <= 4) {
+    return [1, 2, 3, 4, 5, '...', totalPages];
+  }
+  if (currentPage >= totalPages - 3) {
+    return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+  }
+  return [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
+}
 
 export function Contacts() {
   const [activeTab, setActiveTab] = useState<'contacts' | 'groups'>('contacts');
@@ -64,7 +78,18 @@ export function Contacts() {
   const [groupDescription, setGroupDescription] = useState('');
   const [groupError, setGroupError] = useState<string | null>(null);
 
-  const PAGE_SIZE = 50;
+  const [pageSize, setPageSize] = useState<number>(15);
+
+  const effectiveTotal = Math.max(totalCount, subscribers.length);
+  const totalPages = Math.max(1, Math.ceil(effectiveTotal / (pageSize || 15)));
+  const currentPage = Math.min(totalPages, Math.floor(offset / (pageSize || 15)) + 1);
+
+  // Slices to pageSize if backend returns unpaginated array, or keeps paginated list
+  const visibleSubscribers = useMemo(() => {
+    return subscribers.length > pageSize
+      ? subscribers.slice(offset, offset + pageSize)
+      : subscribers;
+  }, [subscribers, offset, pageSize]);
 
   // 1. Fetch Groups
   function loadGroups() {
@@ -88,19 +113,50 @@ export function Contacts() {
     const emailToUse = opts.overrideEmail !== undefined ? opts.overrideEmail : search;
 
     listPaginatedSubscribers({
-      limit: PAGE_SIZE,
+      limit: pageSize,
       offset,
       email: emailToUse.trim() || undefined,
       group_id: selectedGroupId || undefined,
       is_subscribed: isSubscribed,
       is_blacklisted: isBlacklisted,
     })
-      .then((res) => {
-        const items = Array.isArray(res) ? res : res?.results ?? (res as any)?.data ?? [];
-        setSubscribers(items);
-        setTotalCount(res?.count ?? items.length);
+      .then((res: any) => {
+        let rawList: Subscriber[] = [];
+        let totalCountNum: number | undefined;
+
+        if (Array.isArray(res)) {
+          rawList = res;
+          totalCountNum = res.length;
+        } else if (res && typeof res === 'object') {
+          if (Array.isArray(res.results)) {
+            rawList = res.results;
+          } else if (Array.isArray(res.data)) {
+            rawList = res.data;
+          } else if (res.data && Array.isArray(res.data.results)) {
+            rawList = res.data.results;
+          }
+
+          totalCountNum =
+            res.count ??
+            res.total ??
+            res.total_count ??
+            (res.data && typeof res.data.count === 'number' ? res.data.count : undefined) ??
+            (res.data && typeof res.data.total === 'number' ? res.data.total : undefined);
+        }
+
+        setSubscribers(rawList);
+
+        const calculatedTotal =
+          typeof totalCountNum === 'number' && !isNaN(totalCountNum)
+            ? totalCountNum
+            : rawList.length >= pageSize
+            ? offset + rawList.length + 1
+            : offset + rawList.length;
+
+        setTotalCount(calculatedTotal);
+
         if (opts.silent) {
-          const stillPresent = new Set(items.map((i: Subscriber) => i.id));
+          const stillPresent = new Set(rawList.map((i: Subscriber) => i.id));
           setSelectedIds((prev) => prev.filter((id) => stillPresent.has(id)));
         } else {
           setSelectedIds([]);
@@ -116,7 +172,7 @@ export function Contacts() {
     if (activeTab === 'contacts') {
       loadSubscribers();
     }
-  }, [offset, selectedGroupId, statusFilter, activeTab]);
+  }, [offset, selectedGroupId, statusFilter, activeTab, pageSize]);
 
   const socketEnabled = activeTab === 'contacts' && !showAddModal && !editingSubscriber;
   const { connected: socketConnected } = useSubscriberEvents({
@@ -216,8 +272,8 @@ export function Contacts() {
       }
       loadSubscribers();
       loadGroups();
-    } catch {
-      setContactError('Failed to save subscriber.');
+    } catch (err: unknown) {
+      setContactError(err instanceof Error ? err.message : 'Failed to save subscriber.');
     }
   }
 
@@ -291,10 +347,10 @@ export function Contacts() {
   }
 
   function toggleSelectAll() {
-    if (selectedIds.length === subscribers.length) {
+    if (visibleSubscribers.length > 0 && selectedIds.length === visibleSubscribers.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(subscribers.map((s) => s.id));
+      setSelectedIds(visibleSubscribers.map((s) => s.id));
     }
   }
 
@@ -365,8 +421,8 @@ export function Contacts() {
       }
       setShowGroupModal(false);
       loadGroups();
-    } catch {
-      setGroupError('Failed to save group.');
+    } catch (err: unknown) {
+      setGroupError(err instanceof Error ? err.message : 'Failed to save group.');
     }
   }
 
@@ -620,7 +676,7 @@ export function Contacts() {
                   <th style={{ width: 36 }}>
                     <input
                       type="checkbox"
-                      checked={subscribers.length > 0 && selectedIds.length === subscribers.length}
+                      checked={visibleSubscribers.length > 0 && selectedIds.length === visibleSubscribers.length}
                       onChange={toggleSelectAll}
                     />
                   </th>
@@ -639,14 +695,14 @@ export function Contacts() {
                       Loading contacts...
                     </td>
                   </tr>
-                ) : subscribers.length === 0 ? (
+                ) : visibleSubscribers.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="empty-state">
                       No contacts match the criteria.
                     </td>
                   </tr>
                 ) : (
-                  subscribers.map((c) => {
+                  visibleSubscribers.map((c) => {
                     const name =
                       [c.first_name, c.last_name]
                         .filter((n) => n && n !== 'nan')
@@ -717,25 +773,87 @@ export function Contacts() {
               marginTop: 16,
               paddingTop: 12,
               borderTop: '1px solid var(--border)',
+              flexWrap: 'wrap',
+              gap: 12,
             }}
           >
-            <span style={{ fontSize: 13, color: 'var(--muted)' }}>
-              Showing {subscribers.length > 0 ? offset + 1 : 0} to {Math.min(offset + PAGE_SIZE, totalCount)} of{' '}
-              {totalCount.toLocaleString()}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 13, color: 'var(--muted)' }}>
+                Showing {effectiveTotal > 0 ? offset + 1 : 0} to{' '}
+                {Math.min(offset + (pageSize || 15), effectiveTotal)} of {effectiveTotal.toLocaleString()} contacts
+              </span>
 
-            <div style={{ display: 'flex', gap: 8 }}>
+              {/* Rows per page selector */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 12, color: 'var(--muted)' }}>Rows per page:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    const newSize = Number(e.target.value);
+                    setPageSize(newSize);
+                    setOffset(0);
+                  }}
+                  style={{
+                    height: 28,
+                    padding: '2px 8px',
+                    fontSize: 12,
+                    borderRadius: 4,
+                    border: '1px solid var(--border)',
+                    background: 'var(--card-bg, #fff)',
+                    color: 'var(--foreground)',
+                    cursor: 'pointer',
+                  }}
+                  aria-label="Contacts per page"
+                >
+                  <option value={15}>15</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={1000}>All</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <button
                 className="btn btn--sm"
                 disabled={offset === 0 || loading}
-                onClick={() => setOffset((prev) => Math.max(0, prev - PAGE_SIZE))}
+                onClick={() => setOffset((prev) => Math.max(0, prev - (pageSize || 15)))}
+                style={{ padding: '4px 10px', fontSize: 12 }}
               >
                 Previous
               </button>
+
+              {/* Page Number Pills */}
+              {totalPages > 1 &&
+                getPageNumbers(currentPage, totalPages).map((p, idx) =>
+                  p === '...' ? (
+                    <span key={`dots-${idx}`} style={{ padding: '0 4px', color: 'var(--muted)', fontSize: 12 }}>
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={`page-${p}`}
+                      className={`btn btn--sm ${p === currentPage ? 'btn--primary' : ''}`}
+                      onClick={() => setOffset(((p as number) - 1) * (pageSize || 15))}
+                      disabled={loading}
+                      style={{
+                        padding: '2px 8px',
+                        fontSize: 12,
+                        minWidth: 28,
+                        fontWeight: p === currentPage ? 600 : 400,
+                      }}
+                    >
+                      {p}
+                    </button>
+                  )
+                )}
+
               <button
                 className="btn btn--sm"
-                disabled={offset + PAGE_SIZE >= totalCount || loading}
-                onClick={() => setOffset((prev) => prev + PAGE_SIZE)}
+                disabled={offset + (pageSize || 15) >= effectiveTotal || loading}
+                onClick={() => setOffset((prev) => prev + (pageSize || 15))}
+                style={{ padding: '4px 10px', fontSize: 12 }}
               >
                 Next
               </button>
@@ -819,158 +937,236 @@ export function Contacts() {
       {/* ==================================================== */}
       {/* MODAL: ADD / EDIT CONTACT */}
       {/* ==================================================== */}
-      {(showAddModal || editingSubscriber) && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h3 className="modal-title">{editingSubscriber ? 'Edit Contact' : 'Add Contact'}</h3>
-              <button 
-                className="modal-close" 
-                onClick={() => {
-                  setShowAddModal(false);
-                  setEditingSubscriber(null);
-                }}
-              >
-                ×
-              </button>
-            </div>
-            
-            <form onSubmit={handleSaveContact}>
-              <div className="field" style={{ marginBottom: 12 }}>
-                <label>Email *</label>
-                <input
-                  type="email"
-                  required
-                  disabled={!!editingSubscriber}
-                  value={formEmail}
-                  onChange={(e) => setFormEmail(e.target.value)}
-                  placeholder="subscriber@example.com"
-                />
-              </div>
-
-              <div className="field" style={{ marginBottom: 12 }}>
-                <label>First Name</label>
-                <input
-                  value={formFirstName}
-                  onChange={(e) => setFormFirstName(e.target.value)}
-                  placeholder="Jane"
-                />
-              </div>
-
-              <div className="field" style={{ marginBottom: 12 }}>
-                <label>Last Name</label>
-                <input
-                  value={formLastName}
-                  onChange={(e) => setFormLastName(e.target.value)}
-                  placeholder="Doe"
-                />
-              </div>
-
-              <div className="field" style={{ marginBottom: 12 }}>
-                <label>Group</label>
-                <select
-                  value={formGroupId ?? ''}
-                  onChange={(e) => setFormGroupId(e.target.value ? Number(e.target.value) : undefined)}
-                >
-                  <option value="">Select a group</option>
-                  {groups.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Status toggles */}
-              <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={formIsSubscribed}
-                    onChange={(e) => setFormIsSubscribed(e.target.checked)}
-                  />
-                  Subscribed
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={formIsBlacklisted}
-                    onChange={(e) => setFormIsBlacklisted(e.target.checked)}
-                  />
-                  Blacklisted
-                </label>
-              </div>
-
-              {contactError && <p style={{ color: 'red', fontSize: 13 }}>{contactError}</p>}
-
-              <div className="modal-actions">
-                <button
-                  type="button"
-                  className="btn"
+      {(showAddModal || editingSubscriber) &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className="modal-overlay"
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              width: '100vw',
+              height: '100vh',
+              backgroundColor: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(4px)',
+              WebkitBackdropFilter: 'blur(4px)',
+              zIndex: 99999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '16px',
+              boxSizing: 'border-box',
+            }}
+          >
+            <div
+              className="modal-content"
+              style={{
+                backgroundColor: '#ffffff',
+                borderRadius: '12px',
+                width: 'min(480px, 94vw)',
+                maxHeight: '90vh',
+                overflowY: 'auto',
+                padding: '24px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.08)',
+                position: 'relative',
+                display: 'flex',
+                flexDirection: 'column',
+                boxSizing: 'border-box',
+                margin: 'auto',
+              }}
+            >
+              <div className="modal-header">
+                <h3 className="modal-title">{editingSubscriber ? 'Edit Contact' : 'Add Contact'}</h3>
+                <button 
+                  className="modal-close" 
                   onClick={() => {
                     setShowAddModal(false);
                     setEditingSubscriber(null);
                   }}
                 >
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn--primary">
-                  Save
+                  ×
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
+              
+              <form onSubmit={handleSaveContact}>
+                <div className="field" style={{ marginBottom: 12 }}>
+                  <label>Email *</label>
+                  <input
+                    type="email"
+                    required
+                    disabled={!!editingSubscriber}
+                    value={formEmail}
+                    onChange={(e) => setFormEmail(e.target.value)}
+                    placeholder="subscriber@example.com"
+                  />
+                </div>
+
+                <div className="field" style={{ marginBottom: 12 }}>
+                  <label>First Name</label>
+                  <input
+                    value={formFirstName}
+                    onChange={(e) => setFormFirstName(e.target.value)}
+                    placeholder="Jane"
+                  />
+                </div>
+
+                <div className="field" style={{ marginBottom: 12 }}>
+                  <label>Last Name</label>
+                  <input
+                    value={formLastName}
+                    onChange={(e) => setFormLastName(e.target.value)}
+                    placeholder="Doe"
+                  />
+                </div>
+
+                <div className="field" style={{ marginBottom: 12 }}>
+                  <label>Group</label>
+                  <select
+                    value={formGroupId ?? ''}
+                    onChange={(e) => setFormGroupId(e.target.value ? Number(e.target.value) : undefined)}
+                  >
+                    <option value="">Select a group</option>
+                    {groups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Status toggles */}
+                <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={formIsSubscribed}
+                      onChange={(e) => setFormIsSubscribed(e.target.checked)}
+                    />
+                    Subscribed
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={formIsBlacklisted}
+                      onChange={(e) => setFormIsBlacklisted(e.target.checked)}
+                    />
+                    Blacklisted
+                  </label>
+                </div>
+
+                {contactError && <p style={{ color: 'red', fontSize: 13 }}>{contactError}</p>}
+
+                <div className="modal-actions">
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => {
+                      setShowAddModal(false);
+                      setEditingSubscriber(null);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn--primary">
+                    Save
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>,
+          document.body
+        )}
 
       {/* ==================================================== */}
       {/* MODAL: ADD / EDIT GROUP */}
       {/* ==================================================== */}
-      {showGroupModal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h3 className="modal-title">{editingGroup ? 'Edit Group' : 'Create Subscriber Group'}</h3>
-              <button className="modal-close" onClick={() => setShowGroupModal(false)}>
-                ×
-              </button>
+      {showGroupModal &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className="modal-overlay"
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              width: '100vw',
+              height: '100vh',
+              backgroundColor: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(4px)',
+              WebkitBackdropFilter: 'blur(4px)',
+              zIndex: 99999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '16px',
+              boxSizing: 'border-box',
+            }}
+          >
+            <div
+              className="modal-content"
+              style={{
+                backgroundColor: '#ffffff',
+                borderRadius: '12px',
+                width: 'min(480px, 94vw)',
+                maxHeight: '90vh',
+                overflowY: 'auto',
+                padding: '24px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.08)',
+                position: 'relative',
+                display: 'flex',
+                flexDirection: 'column',
+                boxSizing: 'border-box',
+                margin: 'auto',
+              }}
+            >
+              <div className="modal-header">
+                <h3 className="modal-title">{editingGroup ? 'Edit Group' : 'Create Subscriber Group'}</h3>
+                <button className="modal-close" onClick={() => setShowGroupModal(false)}>
+                  ×
+                </button>
+              </div>
+              
+              <form onSubmit={handleSaveGroup}>
+                <div className="field" style={{ marginBottom: 12 }}>
+                  <label>Group Name *</label>
+                  <input
+                    required
+                    value={groupName}
+                    onChange={(e) => setGroupName(e.target.value)}
+                    placeholder="e.g. Newsletter Subscribers"
+                  />
+                </div>
+
+                <div className="field" style={{ marginBottom: 16 }}>
+                  <label>Description</label>
+                  <textarea
+                    value={groupDescription}
+                    onChange={(e) => setGroupDescription(e.target.value)}
+                    placeholder="Describe this group..."
+                    rows={3}
+                  />
+                </div>
+
+                {groupError && <p style={{ color: 'red', fontSize: 13 }}>{groupError}</p>}
+
+                <div className="modal-actions">
+                  <button type="button" className="btn" onClick={() => setShowGroupModal(false)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn--primary">
+                    {editingGroup ? 'Save Changes' : 'Create Group'}
+                  </button>
+                </div>
+              </form>
             </div>
-            
-            <form onSubmit={handleSaveGroup}>
-              <div className="field" style={{ marginBottom: 12 }}>
-                <label>Group Name *</label>
-                <input
-                  required
-                  value={groupName}
-                  onChange={(e) => setGroupName(e.target.value)}
-                  placeholder="e.g. Newsletter Subscribers"
-                />
-              </div>
-
-              <div className="field" style={{ marginBottom: 16 }}>
-                <label>Description</label>
-                <textarea
-                  value={groupDescription}
-                  onChange={(e) => setGroupDescription(e.target.value)}
-                  placeholder="Describe this group..."
-                  rows={3}
-                />
-              </div>
-
-              {groupError && <p style={{ color: 'red', fontSize: 13 }}>{groupError}</p>}
-
-              <div className="modal-actions">
-                <button type="button" className="btn" onClick={() => setShowGroupModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn--primary">
-                  {editingGroup ? 'Save Changes' : 'Create Group'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
