@@ -8,10 +8,12 @@ import {
 } from 'react';
 import type { ReactNode } from 'react';
 
-import { SESSION_EXPIRED_EVENT } from '../services/apiClient';
+import { SESSION_EXPIRED_EVENT, getAccessToken } from '../services/apiClient';
+
 
 import {
   AuthError,
+  getCachedUser,
   invalidateSession,
   isSessionValid,
   loginWithPassword as loginWithPasswordRequest,
@@ -58,19 +60,25 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(() => getCachedUser());
 
   /**
    * IMPORTANT:
    * Start as true so App.tsx does not immediately assume the user
    * is logged out while /me/ is being checked.
    */
-  const [loading, setLoading] = useState(true);
+  // const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(
+    () => getAccessToken() !== null && getCachedUser() === null,
+  );
 
   const [loginMethod, setLoginMethod] = useState<LoginMethod>('password');
   const [pendingUserId, setPendingUserId] = useState<number | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [expiresAt, setExpiresAt] = useState<number>(0);
+  // const [expiresAt, setExpiresAt] = useState<number>(0);
+  const [expiresAt, setExpiresAt] = useState<number>(() =>
+    getCachedUser() ? Date.now() + SESSION_TIMEOUT_MS : 0,
+  );
 
   const timerRef = useRef<number | null>(null);
 
@@ -96,35 +104,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * from being treated as a logout just because "user" initially
    * starts as null.
    */
+  // useEffect(() => {
+  //   let cancelled = false;
+
+  //   const restoreExistingSession = async () => {
+  //     if (!getAccessToken()){
+  //       if (!cancelled) setLoading(false);
+  //       return;
+  //     }
+  //     try {
+  //       const restoredUser = await refreshSession();
+
+  //       if (cancelled) return;
+
+  //       setUser(restoredUser);
+  //       resetTimer();
+  //     } catch {
+  //       if (cancelled) return;
+
+  //       setUser(null);
+  //       setExpiresAt(0);
+  //     } finally {
+  //       if (!cancelled) {
+  //         setLoading(false);
+  //       }
+  //     }
+  //   };
+
+  //   restoreExistingSession();
+
+  //   return () => {
+  //     cancelled = true;
+  //   };
+  // }, [resetTimer]);
+
   useEffect(() => {
-    let cancelled = false;
+  if (!getAccessToken()) return;
 
-    const restoreExistingSession = async () => {
-      try {
-        const restoredUser = await refreshSession();
+  let cancelled = false;
 
-        if (cancelled) return;
+  refreshSession()
+    .then((restoredUser) => {
+      if (cancelled) return;
+      setUser(restoredUser);
+      resetTimer();
+    })
+    .catch(() => {
+      // An unrecoverable 401 already fires SESSION_EXPIRED_EVENT, which logs
+      // out. Network or server errors keep the cached user on screen.
+    })
+    .finally(() => {
+      if (!cancelled) setLoading(false);
+    });
 
-        setUser(restoredUser);
-        resetTimer();
-      } catch {
-        if (cancelled) return;
-
-        setUser(null);
-        setExpiresAt(0);
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    restoreExistingSession();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [resetTimer]);
+  return () => {
+    cancelled = true;
+  };
+}, [resetTimer]);
 
   const loginWithPassword = useCallback(
     async (email: string, password: string) => {

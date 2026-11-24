@@ -1,0 +1,432 @@
+/* ==========================================================================
+   Users Administration View Styles
+   Harmonized with IBM Plex & Blueprint Design Tokens
+   ========================================================================== */
+
+.users-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* --- Stats Header Bar --- */
+.users-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+.users-stat-card {
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  position: relative;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.users-stat-card:hover {
+  border-color: var(--line-strong);
+}
+
+.users-stat-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.users-stat-icon--users {
+  background: var(--blueprint-dim);
+  color: var(--blueprint);
+}
+
+.users-stat-icon--admins {
+  background: var(--verified-dim);
+  color: var(--verified);
+}
+
+.users-stat-icon--companies {
+  background: var(--amber-dim);
+  color: var(--amber);
+}
+
+.users-stat-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.users-stat-label {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.users-stat-value {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.1;
+}
+
+/* --- Filter & Action Bar --- */
+.users-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.users-search-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 320px;
+}
+
+.users-search-input-wrapper {
+  position: relative;
+  flex: 1 1 240px;
+  min-width: 200px;
+}
+
+.users-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.users-search-input {
+  width: 100%;
+  padding-left: 34px !important;
+  padding-right: 28px !important;
+  height: 38px;
+  font-size: 14px;
+}
+
+.users-search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.users-search-clear:hover {
+  color: var(--ink);
+  background: var(--paper);
+}
+
+.users-filter-select {
+  height: 38px;
+  min-width: 170px;
+  font-size: 13.5px;
+}
+
+.users-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* --- Expandable Invite User Drawer --- */
+.users-invite-panel {
+  background: var(--paper-raised);
+  border: 1px solid var(--blueprint);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  position: relative;
+  box-shadow: 0 4px 12px rgba(16, 35, 58, 0.05);
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.users-invite-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 10px;
+}
+
+.users-invite-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.users-invite-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+@media (max-width: 768px) {
+  .users-invite-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Table Enhancements & Typography --- */
+.users-page table.data-table {
+  font-size: 14.5px;
+}
+
+.users-page .data-table th {
+  font-size: 11.5px;
+  padding: 12px 14px;
+  letter-spacing: 0.07em;
+}
+
+.users-page .data-table td {
+  font-size: 14px;
+  padding: 12px 14px;
+}
+
+.users-page .mono {
+  font-size: 13.5px;
+  letter-spacing: -0.01em;
+}
+
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  font-weight: 600;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.user-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.3;
+}
+
+.user-username-tag {
+  font-size: 12.5px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  margin-top: 1px;
+}
+
+.company-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.company-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--blueprint);
+}
+
+/* --- Access Badges --- */
+.badge-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 11px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+}
+
+.badge-role--admin {
+  background: var(--verified-dim);
+  color: var(--verified);
+  border: 1px solid rgba(46, 125, 91, 0.25);
+}
+
+.badge-role--user {
+  background: var(--blueprint-dim);
+  color: var(--blueprint);
+  border: 1px solid rgba(28, 90, 140, 0.2);
+}
+
+/* --- Action Buttons in Row --- */
+.row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.btn-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  padding: 5px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--paper-raised);
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-action:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  background: var(--paper);
+}
+
+.btn-action--danger:hover:not(:disabled) {
+  border-color: var(--alert);
+  color: var(--alert);
+  background: var(--alert-dim);
+}
+
+/* --- Pagination Bar --- */
+.users-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 16px;
+  margin-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.users-pagination-info {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.users-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.users-pagination-controls .btn {
+  font-size: 13px;
+}
+
+/* --- Feedback Banners --- */
+.users-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+.users-alert--error {
+  background: var(--alert-dim);
+  border: 1px solid var(--alert);
+  color: var(--alert);
+}
+
+.users-alert--success {
+  background: var(--verified-dim);
+  border: 1px solid var(--verified);
+  color: var(--verified);
+}
+
+/* --- Modal Overlays & Styles --- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 35, 58, 0.55);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.modal-dialog {
+  width: 100%;
+  max-width: 480px;
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 24px 26px;
+  box-shadow: 0 20px 40px rgba(16, 35, 58, 0.25);
+  position: relative;
+  animation: modalPop 0.18s ease-out;
+}
+
+@keyframes modalPop {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.modal-dialog--danger {
+  border-color: var(--alert);
+}

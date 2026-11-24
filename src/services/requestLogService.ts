@@ -1,29 +1,43 @@
 // Request Logs (Tmail API, "Request Logs" folder) — see types/requestLog.d.ts
-// for notes on the assumptions baked into this mapping.
+// for the confirmed response shape.
 
 import { apiClient } from './apiClient';
 import type { RequestLogEntry, RequestLogFilters } from '../types';
 
 interface RawRequestLog {
   id: number;
-  action_id: string | number;
+  log_id: string;
+  log_name: string;
+  device_ip: string;
+  log_details: string;
+  user_id: string;
+  partner_id: string | number | null;
   log_status: string;
-  created_at: string;
-  detail?: string;
+  createdon: string;
+  share_user: string;
+  action_id: string | number;
+  device_details: string;
+  request_timestamp: string;
 }
 
 interface RawRequestLogPage {
   count: number;
+  next: string | null;
+  previous: string | null;
   results: RawRequestLog[];
 }
 
 function toEntry(raw: RawRequestLog): RequestLogEntry {
   return {
     id: raw.id,
+    logName: raw.log_name,
     actionId: raw.action_id,
     status: raw.log_status,
-    createdAt: raw.created_at,
-    detail: raw.detail,
+    createdAt: raw.createdon,
+    userId: raw.user_id,
+    detail: raw.log_details,
+    deviceIp: raw.device_ip,
+    deviceDetails: raw.device_details,
   };
 }
 

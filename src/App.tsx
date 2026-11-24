@@ -227,6 +227,7 @@ import { ResetPassword } from './features/auth/ResetPassword';
 import { AcceptInvitation } from './features/auth/AcceptInvitation';
 import { Dashboard } from './features/dashboard/Dashboard';
 import { CampaignStudio } from './features/campaigns/CampaignStudio';
+import { CustomEmail } from './features/campaigns/CustomEmail';
 import { TemplateLibrary } from './features/templates/TemplateLibrary';
 import { TemplateEditor } from './features/templates/TemplateEditor';
 import { Contacts } from './features/audience/Contacts';
@@ -235,7 +236,6 @@ import { Analytics } from './features/insight/Analytics';
 import { Quota } from './features/administration/Quota';
 import { Users } from './features/administration/Users';
 import { Companies } from './features/administration/Companies';
-import { Wallets } from './features/administration/Wallets';
 import { RequestLogs } from './features/administration/RequestLogs';
 import { AuditLog } from './features/administration/AuditLog';
 import { Messages } from './features/message-log/Messages';
@@ -249,6 +249,7 @@ import type { UserRole } from './types';
 const TITLES: Record<string, string> = {
   '/': 'Dashboard',
   '/campaigns': 'Campaign Studio',
+  '/custom-email': 'Custom Email',
   '/templates': 'Template Library',
   '/contacts': 'Contacts & Lists',
   '/hygiene': 'Data Hygiene',
@@ -258,7 +259,6 @@ const TITLES: Record<string, string> = {
   '/quota': 'Quota & Alerts',
   '/users': 'User Administration',
   '/companies': 'Companies',
-  '/wallets': 'Wallets',
   '/request-logs': 'Request Logs',
   '/roles': 'Roles & Permissions',
   '/audit': 'Audit Log',
@@ -276,8 +276,12 @@ function RequireRole({ roles, children }: { roles?: UserRole[]; children: ReactN
 }
 
 export default function App() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const location = useLocation();
+
+  if (loading) {
+    return <div className="empty-state">Restoring your session</div>;
+  }
 
   if (!user) {
     return (
@@ -305,6 +309,14 @@ export default function App() {
             element={
               <RequireRole roles={['admin', 'campaign_manager']}>
                 <CampaignStudio />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/custom-email"
+            element={
+              <RequireRole roles={['admin', 'campaign_manager']}>
+                <CustomEmail />
               </RequireRole>
             }
           />
@@ -375,14 +387,14 @@ export default function App() {
               </RequireRole>
             }
           />
-          <Route
+          {/* <Route
             path="/wallets"
             element={
               <RequireRole roles={['admin']}>
                 <Wallets />
               </RequireRole>
             }
-          />
+          /> */}
           <Route
             path="/request-logs"
             element={

@@ -1,0 +1,277 @@
+/* ==========================================================================
+   Request Logs Responsive Styles
+   Harmonized with IBM Plex & Blueprint Design Tokens
+   ========================================================================== */
+
+.request-logs__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.request-logs__toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 360px;
+  flex-wrap: wrap;
+}
+
+.request-logs__search-wrap {
+  position: relative;
+  flex: 1 1 220px;
+  min-width: 180px;
+}
+
+.request-logs__search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.request-logs__search-input {
+  width: 100%;
+  height: 36px;
+  padding-left: 32px !important;
+  padding-right: 28px !important;
+  font-family: inherit;
+  font-size: 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--paper-raised);
+  color: var(--ink);
+  box-sizing: border-box;
+}
+
+.request-logs__search-input:focus,
+.request-logs__select:focus {
+  border-color: var(--blueprint);
+  outline: 2px solid var(--blueprint-dim);
+}
+
+.request-logs__search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.request-logs__search-clear:hover {
+  color: var(--ink);
+  background: var(--paper);
+}
+
+.request-logs__select-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.request-logs__select-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.request-logs__select {
+  height: 36px;
+  padding: 6px 12px 6px 30px;
+  font-family: inherit;
+  font-size: 12.5px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--paper-raised);
+  color: var(--ink);
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.request-logs__action-tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.request-logs__mobile-label {
+  display: none;
+}
+
+.request-logs__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 14px;
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.request-logs__pagination-info {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.request-logs__pagination-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ==========================================================================
+   Small Devices & Mobile (<= 680px)
+   Transforms rigid wide table into adaptive, touch-friendly event cards
+   ========================================================================== */
+@media (max-width: 680px) {
+  .request-logs__toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .request-logs__toolbar-left {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .request-logs__search-wrap,
+  .request-logs__select-wrap {
+    display: flex;
+    width: 100%;
+  }
+
+  .request-logs__search-input,
+  .request-logs__select {
+    width: 100%;
+  }
+
+  /* Table becomes mobile card stack */
+  .request-logs__table-wrap {
+    overflow-x: visible !important;
+  }
+
+  .request-logs__table {
+    min-width: 0 !important;
+    display: block;
+    width: 100%;
+  }
+
+  .request-logs__table thead {
+    display: none;
+  }
+
+  .request-logs__table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .request-logs__row {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    box-shadow: 0 1px 3px rgba(16, 35, 58, 0.04);
+  }
+
+  .request-logs__row td {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 0 !important;
+    border-bottom: none !important;
+  }
+
+  .request-logs__mobile-label {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    min-width: 58px;
+    flex-shrink: 0;
+  }
+
+  .request-logs__cell-time {
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+
+  .request-logs__cell-detail {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    background: var(--paper);
+    padding: 8px 10px !important;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    margin-top: 4px;
+    gap: 4px;
+  }
+
+  .request-logs__detail-content {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    font-size: 12.5px;
+    color: var(--ink);
+    line-height: 1.4;
+  }
+
+  /* Pagination on mobile */
+  .request-logs__pagination {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .request-logs__pagination-info {
+    text-align: center;
+    font-size: 12px;
+  }
+
+  .request-logs__pagination-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .request-logs__pagination-actions .btn {
+    flex: 1;
+    display: inline-flex;
+    justify-content: center;
+    height: 38px;
+    font-size: 13px;
+  }
+}

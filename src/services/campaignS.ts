@@ -69,10 +69,28 @@ function normalizeStatus(value: unknown): Campaign['status'] {
 }
 
 function toCampaign(raw: RawCampaign): Campaign {
+  const subjectValue = (
+    raw.subject ??
+    raw.campaign_subject ??
+    (raw as any).email_subject ??
+    (raw as any).subject_line ??
+    (raw as any).title ??
+    ''
+  ).trim();
+
+  const nameValue = (
+    raw.name ??
+    raw.title ??
+    raw.campaign_name ??
+    ''
+  ).trim() || `Campaign ${raw.id}`;
+
+  const bodyValue = raw.body ?? raw.html ?? (raw as any).content ?? undefined;
+
   return {
     id: String(raw.id),
-    name: (raw.name ?? raw.title ?? raw.campaign_name ?? '').trim() || `Campaign ${raw.id}`,
-    subject: (raw.subject ?? raw.campaign_subject ?? '').trim(),
+    name: nameValue,
+    subject: subjectValue,
     status: normalizeStatus(raw.status),
     recipients: numberValue(raw.recipients ?? raw.recipient_count),
     targetGroup: raw.targetGroup ?? raw.target_group ?? raw.list_name ?? raw.list ?? undefined,
@@ -84,7 +102,7 @@ function toCampaign(raw: RawCampaign): Campaign {
     bounceRate: optionalNumber(raw.bounceRate ?? raw.bounce_rate),
     emailStatus: raw.emailStatus ?? raw.email_status ?? undefined,
     deliveryStatus: raw.deliveryStatus ?? raw.delivery_status ?? undefined,
-    body: raw.body ?? raw.html ?? undefined,
+    body: bodyValue,
     fromEmail: raw.fromEmail ?? raw.from_email ?? undefined,
     sender: raw.sender ?? undefined,
     template: raw.template == null ? undefined : String(raw.template),
@@ -107,17 +125,15 @@ function extractCampaign(payload: SingleCampaignResponse): Campaign {
 
 function buildCampaignPayload(
   draft: Partial<CampaignDraft>,
-  status = 'draft',
+  _status = 'draft',
   schedule?: { scheduledFor?: string; startDate?: string; endDate?: string; scheduleType?: string },
 ) {
   const body: Record<string, unknown> = {
-    name: draft.name?.trim() ?? '',
     subject: draft.subject?.trim() ?? '',
-    body: draft.body?.trim() ?? '',
-    from_email: draft.fromEmail?.trim() ?? '',
-    sender: draft.sender?.trim() ?? '',
-    status,
-    is_active: true,
+    html: draft.body?.trim() ?? '',
+    from: 'help@tililtech.com',
+    to: (draft as { to?: string }).to ?? '',
+    sender: 'Tilil Technologies',
   };
 
   if (draft.template) body.template = draft.template;
@@ -414,8 +430,21 @@ export async function sendTestEmail(payload: {
   to: string;
   subject: string;
   html: string;
+  from_email?: string;
+  sender?: string;
+  attachments?: Record<string, unknown> | unknown[];
 }): Promise<unknown> {
-  return apiClient.post('/send-test-mail/', { ...payload, attachments: [] });
+  const fromEmail = payload.from_email?.trim() || 'help@tililtech.com';
+  const senderName = payload.sender?.trim() || 'Tilil Technologies';
+  const targetEmail = payload.to?.trim() ?? '';
+  return apiClient.post('/send-test-mail/', {
+    subject: payload.subject?.trim() ?? '',
+    html: payload.html?.trim() ?? '',
+    from: fromEmail,
+    to: targetEmail,
+    sender: senderName,
+    attachments: payload.attachments ?? {},
+  });
 }
 
 export async function deleteCampaign(campaignId: string): Promise<void> {

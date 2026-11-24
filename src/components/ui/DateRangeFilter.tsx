@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { IconSearch } from '@tabler/icons-react';
 
 export interface DateRangeFilterProps {
   defaultStartDate: string; // "YYYY-MM-DD"
@@ -19,6 +20,10 @@ export function DateRangeFilter({
 }: DateRangeFilterProps) {
   const [startDate, setStartDate] = useState(defaultStartDate);
   const [endDate, setEndDate] = useState(defaultEndDate);
+
+  function handleSearch() {
+    onSearch(startDate, endDate);
+  }
 
   function handleClear() {
     setStartDate(defaultStartDate);
@@ -75,12 +80,14 @@ export function DateRangeFilter({
         />
       </div>
 
-      <button
-        type="button"
-        className="btn btn--primary"
-        onClick={() => onSearch(startDate, endDate)}
+      <button 
+        type="button" 
+        className="btn btn--primary" 
+        onClick={handleSearch}
+        style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
       >
-        🔍 Search
+        <IconSearch size={16} stroke={2} />
+        Search
       </button>
 
       <button type="button" className="btn" onClick={handleClear}>

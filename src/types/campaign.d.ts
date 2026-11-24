@@ -54,6 +54,12 @@ export interface Campaign {
   fromEmail?: string;
   sender?: string;
   template?: string;
+  groupIds?: number[];
+  recipientIds?: number[];
+  frequency?: string;
+  startDate?: string;
+  endDate?: string;
+  startTime?: string | null;
 }
 
 export interface CampaignDraft {
@@ -65,4 +71,11 @@ export interface CampaignDraft {
   fromEmail?: string;
   sender?: string;
   template?: string;
+  recipient_ids?: number[];
+  group_ids?: number[];
+  frequency?: string;
+  start_date?: string;
+  end_date?: string;
+  start_time?: string | null;
+  attachments?: File[];
 }

@@ -138,7 +138,25 @@ async function request<T>(path: string, options: RequestInit = {}, isRetry = fal
 
   if (!response.ok) {
     const body = await response.json().catch(() => undefined);
-    throw new ApiError(`Request to ${path} failed`, response.status, body);
+    let detail = `Request to ${path} failed`;
+    if (body && typeof body === 'object') {
+      const record = body as Record<string, unknown>;
+      if (typeof record.detail === 'string') {
+        detail = record.detail;
+      } else if (typeof record.message === 'string') {
+        detail = record.message;
+      } else if (typeof record.error === 'string') {
+        detail = record.error;
+      } else {
+        const firstEntry = Object.entries(record)[0];
+        if (firstEntry) {
+          const [field, val] = firstEntry;
+          const msg = Array.isArray(val) ? val.join(', ') : typeof val === 'string' ? val : JSON.stringify(val);
+          detail = `${field}: ${msg}`;
+        }
+      }
+    }
+    throw new ApiError(detail, response.status, body);
   }
 
   if (response.status === 204) return undefined as T;
