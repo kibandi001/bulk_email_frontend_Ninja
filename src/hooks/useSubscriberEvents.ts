@@ -1,6 +1,5 @@
 // Live-update socket for the Contacts/Subscribers page.
 
-
 import { useEffect, useRef, useState } from 'react';
 import { SUBSCRIBERS_WS_URL } from '../config/constants';
 import { getAccessToken } from '../services/apiClient';
@@ -14,17 +13,40 @@ const KNOWN_EVENT_TYPES = new Set([
 const MAX_BACKOFF_MS = 30_000;
 const BASE_BACKOFF_MS = 1_000;
 
-interface UseSubscriberEventsOptions {
-  /** Turn the socket off (e.g. while a modal is open, or off the Contacts tab). */
-  enabled: boolean;
-  /** Called whenever a recognised change event arrives — trigger a silent refetch here. */
-  onChange: () => void;
+export interface UploadEvent {
+  type:
+    | 'subscriber.upload.started'
+    | 'subscriber.upload.progress'
+    | 'subscriber.upload.completed'
+    | 'subscriber.upload.failed';
+  upload_id: number;
+  total?: number;
+  processed?: number;
+  created?: number;
+  updated?: number;
+  failed?: number;
+  error?: string;
 }
 
-export function useSubscriberEvents({ enabled, onChange }: UseSubscriberEventsOptions) {
+interface UseSubscriberEventsOptions {
+  enabled: boolean;
+  /** Called on subscriber.created/updated/deleted and after every (re)connect. */
+  onChange: () => void;
+  /** Called on subscriber.upload.* events. */
+  onUploadEvent?: (e: UploadEvent) => void;
+}
+
+export function useSubscriberEvents({
+  enabled,
+  onChange,
+  onUploadEvent,
+}: UseSubscriberEventsOptions) {
   const [connected, setConnected] = useState(false);
+
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const onUploadRef = useRef(onUploadEvent);
+  onUploadRef.current = onUploadEvent;
 
   useEffect(() => {
     if (!enabled || !SUBSCRIBERS_WS_URL) {
@@ -55,16 +77,20 @@ export function useSubscriberEvents({ enabled, onChange }: UseSubscriberEventsOp
       socket.onopen = () => {
         attempt = 0;
         setConnected(true);
+        // Catch anything missed while disconnected.
+        onChangeRef.current();
       };
 
       socket.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data);
-          if (payload && KNOWN_EVENT_TYPES.has(payload.type)) {
+          if (payload?.type?.startsWith('subscriber.upload.')) {
+            onUploadRef.current?.(payload as UploadEvent);
+          } else if (payload && KNOWN_EVENT_TYPES.has(payload.type)) {
             onChangeRef.current();
           }
         } catch {
-          // Not JSON, or not a shape we recognise — ignore rather than crash.
+          // Not JSON or unrecognised shape: ignore.
         }
       };
 
@@ -73,9 +99,6 @@ export function useSubscriberEvents({ enabled, onChange }: UseSubscriberEventsOp
         if (!cancelled) scheduleRetry();
       };
 
-      // Errors are followed by a close event on every browser we support, so
-      // the retry itself is scheduled from onclose — this just avoids an
-      // unhandled-error console spam on the WebSocket object.
       socket.onerror = () => {};
     }
 

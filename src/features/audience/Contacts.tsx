@@ -18,7 +18,8 @@ import {
 import type { Subscriber, SubscriberGroup } from '../../types/subscriber';
 import { Card } from '../../components/ui/Card';
 import { StatusBadge } from '../../components/ui/StatusBadge';
-import { useSubscriberEvents } from '../../hooks/useSubscriberEvents';
+// import { useSubscriberEvents } from '../../hooks/useSubscriberEvents';
+import { useSubscriberEvents, type UploadEvent } from '../../hooks/useSubscriberEvents';
 import './Contacts.css';
 
 export function Contacts() {
@@ -68,13 +69,17 @@ export function Contacts() {
   const PAGE_SIZE = 50;
 
   // 1. Fetch Groups
-  function loadGroups() {
-    setGroupsLoading(true);
-    listSubscriberGroups()
-      .then(setGroups)
-      .catch((err) => console.error('Failed to load groups:', err))
-      .finally(() => setGroupsLoading(false));
-  }
+ 
+
+  function loadGroups(opts: { silent?: boolean } = {}) {
+  if (!opts.silent) setGroupsLoading(true);
+  listSubscriberGroups()
+    .then(setGroups)
+    .catch((err) => console.error('Failed to load groups:', err))
+    .finally(() => {
+      if (!opts.silent) setGroupsLoading(false);
+    });
+}
 
   useEffect(() => {
     loadGroups();
@@ -131,31 +136,59 @@ export function Contacts() {
   // Both are paused while a modal is open (can't clobber an in-progress
   // add/edit) and off the Contacts tab.
   const socketEnabled = activeTab === 'contacts' && !showAddModal && !editingSubscriber;
-  const { connected: socketConnected } = useSubscriberEvents({
-    enabled: socketEnabled,
-    onChange: () => loadSubscribers({ silent: true }),
-  });
+ 
 
   const POLL_INTERVAL_MS = 15000;
   const POLL_FALLBACK_MS = 60000;
-  useEffect(() => {
-    if (!socketEnabled) return;
 
-    const id = setInterval(
-      () => {
-        loadSubscribers({ silent: true });
-      },
-      socketConnected ? POLL_FALLBACK_MS : POLL_INTERVAL_MS
-    );
-
-    return () => clearInterval(id);
-  }, [socketEnabled, socketConnected, offset, selectedGroupId, statusFilter, search]);
 
   function handleSearchSubmit(e: React.FormEvent) {
     e.preventDefault();
     setOffset(0);
     loadSubscribers();
   }
+
+
+  const [upload, setUpload] = useState<UploadEvent | null>(null);
+
+// Throttled refresh: at most one refetch per 700ms, always uses latest state.
+const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+const refreshNow = () => {
+  loadGroups({ silent: true });
+  if (activeTab === 'contacts' && !showAddModal && !editingSubscriber) {
+    loadSubscribers({ silent: true });
+  }
+};
+const refreshNowRef = useRef(refreshNow);
+refreshNowRef.current = refreshNow;
+
+function refreshLive() {
+  if (refreshTimer.current) return;
+  refreshTimer.current = setTimeout(() => {
+    refreshTimer.current = null;
+    refreshNowRef.current();
+  }, 700);
+}
+
+// Socket stays on for both tabs and while modals are open.
+const { connected: socketConnected } = useSubscriberEvents({
+  enabled: true,
+  onChange: refreshLive,
+  onUploadEvent: (e) => {
+    setUpload(e);
+    refreshLive();
+    if (e.type === 'subscriber.upload.completed' || e.type === 'subscriber.upload.failed') {
+      refreshNowRef.current(); // final exact numbers
+      setTimeout(() => setUpload(null), 5000);
+    }
+  },
+});
+
+// Fallback poll if the socket is down.
+useEffect(() => {
+  const id = setInterval(() => refreshNowRef.current(), socketConnected ? 60000 : 15000);
+  return () => clearInterval(id);
+}, [socketConnected]);
 
   // ----------------------------------------------------
   // CONTACT ACTIONS
@@ -481,6 +514,19 @@ export function Contacts() {
               {importStatus}
             </div>
           )}
+
+          {upload && (
+  <div style={{ marginBottom: 12, padding: '8px 12px', background: 'var(--bg-subtle)', borderRadius: 6 }}>
+    {upload.type === 'subscriber.upload.completed'
+      ? `Upload finished: ${upload.created} added, ${upload.failed} failed`
+      : upload.type === 'subscriber.upload.failed'
+        ? `Upload failed: ${upload.error ?? 'unknown error'}`
+        : `Importing... ${upload.processed ?? 0} / ${upload.total ?? '?'}`}
+    {upload.total ? (
+      <progress value={upload.processed ?? 0} max={upload.total} style={{ width: '100%', marginTop: 6 }} />
+    ) : null}
+  </div>
+)}
 
           {/* Filters Bar */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
